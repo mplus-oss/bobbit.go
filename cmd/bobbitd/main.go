@@ -2,48 +2,48 @@ package main
 
 import (
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"mplus.software/oss/bobbit.go/internal/config"
+	"mplus.software/oss/bobbit.go/config"
+	"mplus.software/oss/bobbit.go/daemon"
 )
 
 var (
-	c       = config.New()
+	c       = config.NewDaemon()
 	sigChan = make(chan os.Signal, 1)
 )
 
 func main() {
 	log.Printf("Directory data: %s", c.DataDir)
-	log.Printf("Socket Path: %s", c.SocketPath)
+	log.Printf("Socket Path: %s", c.BobbitClientConfig.SocketPath)
 
-	if err := os.MkdirAll(c.DataDir, 0755); err != nil {
-		log.Fatalf("Failed to create data directory: %v", err)
-	}
-
-	if err := os.RemoveAll(c.SocketPath); err != nil {
-		log.Fatalf("Failed to remove old socket path: %v", err)
-	}
-
-	listener, err := net.Listen("unix", c.SocketPath)
+	d, err := daemon.CreateDaemon(c)
 	if err != nil {
-		log.Fatalf("Failed to listen in socket path: %v", err)
+		log.Fatalln(err)
 	}
-	defer listener.Close()
 
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	go CleanupDaemon()
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	go d.CleanupDaemon(sigChan)
 	log.Println("Daemon started, waiting for response.")
 
 	for {
-		conn, err := listener.Accept()
+		conn, err := d.SocketListener.Accept()
 		if err != nil {
 			log.Printf("Failed to receive connection: %v", err)
 			continue
 		}
-		go HandleConnection(conn)
+		defer conn.Close()
+
+		payload, err := d.GetPayload(conn)
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+		log.Printf("Job received: id=%s command=%s", payload.ID, payload.Command)
+
+		go d.HandleJob(payload)
 	}
 }
 
