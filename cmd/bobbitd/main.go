@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -36,13 +37,19 @@ func main() {
 		}
 		defer conn.Close()
 
-		payload, err := d.GetPayload(conn)
-		if err != nil {
-			log.Print(err)
-			continue
-		}
-		log.Printf("Job received: %+v", payload)
-
-		go RouteHandler(d, payload)
+		go handleConnection(d, conn)
 	}
+}
+
+func handleConnection(d *daemon.DaemonStruct, conn net.Conn) {
+	jobCtx := d.NewJobContext(conn)
+	defer jobCtx.Close()
+
+	if err := jobCtx.GetPayload(); err != nil {
+		log.Println(err)
+		return
+	}
+	log.Printf("Job received: %+v", jobCtx.Payload)
+
+	RouteHandler(d, jobCtx)
 }

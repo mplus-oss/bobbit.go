@@ -7,9 +7,19 @@ import (
 	"mplus.software/oss/bobbit.go/payload"
 )
 
-func RouteHandler(d *daemon.DaemonStruct, p payload.JobPayload) {
-	if p.Request == payload.EXECUTE_JOB {
-		d.HandleJob(p)
+func RouteHandler(d *daemon.DaemonStruct, jc *daemon.JobContext) {
+	p := jc.Payload
+	if p.Request == payload.REQUEST_EXECUTE_JOB {
+		if err := d.HandleJob(p); err != nil {
+			log.Println(err)
+		}
+		return
+	}
+
+	if p.Request == payload.REQUEST_LIST {
+		if err := d.ListJob(jc); err != nil {
+			log.Println(err)
+		}
 		return
 	}
 
