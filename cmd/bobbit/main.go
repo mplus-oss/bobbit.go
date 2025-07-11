@@ -18,6 +18,7 @@ var (
 func init() {
 	RegisterCreateCommand()
 	RegisterDaemonCommand()
+	RegisterListCommand()
 }
 
 func main() {

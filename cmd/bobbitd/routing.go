@@ -7,11 +7,20 @@ import (
 	"mplus.software/oss/bobbit.go/payload"
 )
 
-func RouteHandler(d *daemon.DaemonStruct, p payload.JobPayload) {
-	if p.Request == payload.EXECUTE_JOB {
-		d.HandleJob(p)
+func RouteHandler(d *daemon.DaemonStruct, jc *daemon.JobContext) {
+	if jc.Payload.Request == payload.REQUEST_EXECUTE_JOB {
+		if err := d.HandleJob(jc); err != nil {
+			log.Println(err)
+		}
 		return
 	}
 
-	log.Printf("Outbound request database from job %s: requestIota=%v", p.ID, p.Request)
+	if jc.Payload.Request == payload.REQUEST_LIST {
+		if err := d.ListJob(jc); err != nil {
+			log.Println(err)
+		}
+		return
+	}
+
+	log.Printf("WARNING: Outbound request: %+v", jc)
 }

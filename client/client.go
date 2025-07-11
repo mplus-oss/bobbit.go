@@ -5,7 +5,6 @@ import (
 	"net"
 
 	"mplus.software/oss/bobbit.go/config"
-	"mplus.software/oss/bobbit.go/payload"
 )
 
 type DaemonConnectionStruct struct {
@@ -21,8 +20,15 @@ func CreateConnection(c config.BobbitClientConfig) (*DaemonConnectionStruct, err
 	return &DaemonConnectionStruct{Connection: conn}, nil
 }
 
-func (d *DaemonConnectionStruct) SendPayload(payload payload.JobPayload) error {
-	if err := json.NewEncoder(d.Connection).Encode(payload); err != nil {
+func (d *DaemonConnectionStruct) SendPayload(target any) error {
+	if err := json.NewEncoder(d.Connection).Encode(target); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *DaemonConnectionStruct) GetPayload(target any) error {
+	if err := json.NewDecoder(d.Connection).Decode(target); err != nil {
 		return err
 	}
 	return nil
