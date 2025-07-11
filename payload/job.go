@@ -19,14 +19,6 @@ type JobPayload struct {
 	Metadata  map[string]any     `json:"metadata,omitempty"`
 }
 
-type JobRequestMetadata struct {
-	ID        string         `json:"id"`
-	Timestamp time.Time      `json:"timestamp"`
-	Command   []string       `json:"command,omitempty"`
-	Metadata  map[string]any `json:"metadata,omitempty"`
-	JobPayload
-}
-
 func (j *JobPayload) UnmarshalMetadata(target any) error {
 	metadataBytes, err := json.Marshal(j.Metadata)
 	if err != nil {
