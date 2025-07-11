@@ -1,9 +1,12 @@
 package config
 
 import (
+	"fmt"
 	"path/filepath"
+	"time"
 
 	"mplus.software/oss/bobbit.go/internal/lib"
+	"mplus.software/oss/bobbit.go/payload"
 )
 
 type BobbitDaemonConfig struct {
@@ -18,14 +21,22 @@ func NewDaemon() BobbitDaemonConfig {
 	}
 }
 
-func (c BobbitDaemonConfig) GetLockfilePath(id string) string {
-	return filepath.Join(c.DataDir, id+".lock")
+func (c BobbitDaemonConfig) GetLockfilePath(p payload.JobPayload) string {
+	return filepath.Join(c.DataDir, generateFilePath(p, "lock"))
 }
 
-func (c BobbitDaemonConfig) GetLogfilePath(id string) string {
-	return filepath.Join(c.DataDir, id+".log")
+func (c BobbitDaemonConfig) GetLogfilePath(p payload.JobPayload) string {
+	return filepath.Join(c.DataDir, generateFilePath(p, "log"))
 }
 
-func (c BobbitDaemonConfig) GetExitCodePath(id string) string {
-	return filepath.Join(c.DataDir, id+".exitcode")
+func (c BobbitDaemonConfig) GetExitCodePath(p payload.JobPayload) string {
+	return filepath.Join(c.DataDir, generateFilePath(p, "exitcode"))
+}
+
+func (c BobbitDaemonConfig) GetMetadataPath(p payload.JobPayload) string {
+	return filepath.Join(c.DataDir, generateFilePath(p, "metadata"))
+}
+
+func generateFilePath(p payload.JobPayload, execPath string) string {
+	return fmt.Sprintf("%s-%s.%s", p.Timestamp.Format(time.RFC3339), p.ID, execPath)
 }

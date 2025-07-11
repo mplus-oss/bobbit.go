@@ -2,11 +2,9 @@ package daemon
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"time"
 
 	"mplus.software/oss/bobbit.go/config"
@@ -16,6 +14,12 @@ import (
 type DaemonStruct struct {
 	SocketListener net.Listener
 	config.BobbitDaemonConfig
+}
+
+type JobContext struct {
+	conn    net.Conn
+	daemon  *DaemonStruct
+	Payload payload.JobPayload
 }
 
 func CreateDaemon(c config.BobbitDaemonConfig) (*DaemonStruct, error) {
@@ -38,6 +42,13 @@ func CreateDaemon(c config.BobbitDaemonConfig) (*DaemonStruct, error) {
 	}, nil
 }
 
+func (d *DaemonStruct) NewJobContext(conn net.Conn) *JobContext {
+	return &JobContext{
+		conn:   conn,
+		daemon: d,
+	}
+}
+
 func (d *DaemonStruct) CleanupDaemon(sigChan <-chan os.Signal) {
 	<-sigChan
 	log.Println("Cleanup daemon...")
@@ -45,56 +56,26 @@ func (d *DaemonStruct) CleanupDaemon(sigChan <-chan os.Signal) {
 	os.Exit(0)
 }
 
-func (d *DaemonStruct) GetPayload(conn net.Conn) (payload payload.JobPayload, err error) {
-	if err = json.NewDecoder(conn).Decode(&payload); err != nil {
-		return payload, &DaemonError{"Failed to decode payload.", err}
+func (jc *JobContext) GetPayload() error {
+	var p payload.JobPayload
+	if err := json.NewDecoder(jc.conn).Decode(&p); err != nil {
+		return &DaemonError{"Failed to decode payload.", err}
 	}
-	if payload.ID == "" || len(payload.Command) < 1 {
-		return payload, &DaemonError{"Invalid payload: ID or Command not provided.", err}
-	}
-	if payload.Timestamp.IsZero() {
-		payload.Timestamp = time.Now()
+	if p.Timestamp.IsZero() {
+		p.Timestamp = time.Now()
 	}
 
-	return payload, nil
+	jc.Payload = p
+	return nil
 }
 
-func (d *DaemonStruct) HandleJob(payload payload.JobPayload) error {
-	lockFile := d.BobbitDaemonConfig.GetLockfilePath(payload.ID)
-	logFile := d.BobbitDaemonConfig.GetLogfilePath(payload.ID)
-	exitCodeFile := d.BobbitDaemonConfig.GetExitCodePath(payload.ID)
-
-	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
-		return &DaemonPayloadError{"Failed to create lockfile.", payload.ID, err}
+func (jc *JobContext) SendPayload(target any) error {
+	if err := json.NewEncoder(jc.conn).Encode(target); err != nil {
+		return err
 	}
-	defer os.Remove(lockFile)
-
-	logOutput, err := os.Create(logFile)
-	if err != nil {
-		return &DaemonPayloadError{"Failed to create logfile.", payload.ID, err}
-	}
-	defer logOutput.Close()
-
-	exitCode := 0
-	if len(payload.Command) == 0 {
-		return &DaemonPayloadError{"No command provided.", payload.ID, err}
-	}
-
-	cmd := exec.Command(payload.Command[0], payload.Command[1:]...)
-	cmd.Stdout = logOutput
-	cmd.Stderr = logOutput
-	cmd.Env = append(os.Environ(), fmt.Sprintf("JOB_ID=%s", payload.ID))
-	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		} else {
-			exitCode = 127
-		}
-	}
-
-	if err := os.WriteFile(exitCodeFile, fmt.Appendf([]byte{}, "%d", exitCode), 0644); err != nil {
-		(&DaemonPayloadError{"Failed to create exitcode file. Please handle it manually.", payload.ID, err}).Warning()
-	}
-	log.Printf("DONE: %s exit=%d", payload.ID, exitCode)
 	return nil
+}
+
+func (jc *JobContext) Close() {
+	jc.conn.Close()
 }

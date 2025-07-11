@@ -73,7 +73,7 @@ func (d *DaemonStruct) HandleJob(payload payload.JobPayload) error {
 func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	p := jc.Payload
 
-	var statusRequest payload.JobStatus
+	var statusRequest payload.JobStatusMetadata
 	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 
 	allJobs := []payload.JobStatus{}
 	for id := range jobIDs {
-		jobPath := func (ext string) string { return filepath.Join(d.DataDir, id+ext) }
+		jobPath := func(ext string) string { return filepath.Join(d.DataDir, id+ext) }
 
 		status := payload.JobStatus{}
 		status.ID = strings.Join(strings.Split(id, "-")[3:], "-")
