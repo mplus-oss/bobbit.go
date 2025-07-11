@@ -10,6 +10,9 @@ const (
 type JobStatus struct {
 	Status      JobStatusEnum `json:"status"`
 	ExitCode    int           `json:"exitcode"`
-	RequestMeta bool          `json:"request_meta"`
 	JobPayload
+}
+
+type JobStatusMetadata struct {
+	RequestMeta bool `json:"request_meta"`
 }

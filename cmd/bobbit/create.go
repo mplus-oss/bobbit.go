@@ -37,7 +37,7 @@ func RegisterCreateCommand() {
 			payload := payload.JobPayload{
 				ID:       id,
 				Command:  command,
-				Request:  payload.EXECUTE_JOB,
+				Request:  payload.REQUEST_EXECUTE_JOB,
 				Metadata: metadata,
 			}
 			if err := conn.SendPayload(payload); err != nil {
