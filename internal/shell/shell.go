@@ -10,7 +10,7 @@ func Print(message string) {
 }
 
 func Println(message string) {
-	Print(message+"\n")
+	Print(message + "\n")
 }
 
 func Printf(format string, v ...any) {

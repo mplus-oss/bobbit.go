@@ -46,10 +46,10 @@ func (d *DaemonStruct) CleanupDaemon(sigChan <-chan os.Signal) {
 
 func (d *DaemonStruct) GetPayload(conn net.Conn) (payload payload.JobPayload, err error) {
 	if err = json.NewDecoder(conn).Decode(&payload); err != nil {
-		return payload, &DaemonError{"Failed to decode payload.", err} 
+		return payload, &DaemonError{"Failed to decode payload.", err}
 	}
 	if payload.ID == "" || len(payload.Command) < 1 {
-		return payload, &DaemonError{"Invalid payload: ID or Command not provided.", err} 
+		return payload, &DaemonError{"Invalid payload: ID or Command not provided.", err}
 	}
 
 	return payload, nil

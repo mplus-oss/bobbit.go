@@ -6,7 +6,7 @@ import (
 	"mplus.software/oss/bobbit.go/config"
 )
 
-type DaemonNotRunningError struct{
+type DaemonNotRunningError struct {
 	NetError error
 	Config   config.BobbitClientConfig
 }

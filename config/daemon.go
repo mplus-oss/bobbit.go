@@ -7,7 +7,7 @@ import (
 )
 
 type BobbitDaemonConfig struct {
-	DataDir    string
+	DataDir string
 	BobbitClientConfig
 }
 

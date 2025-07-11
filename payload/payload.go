@@ -1,6 +1,7 @@
 package payload
 
 type PayloadRequestEnum int32
+
 const (
 	EXECUTE_JOB PayloadRequestEnum = 1 << iota
 	LIST

@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-type DaemonError struct{
+type DaemonError struct {
 	Message     string
 	ParentError error
 }
