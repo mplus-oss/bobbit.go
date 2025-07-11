@@ -43,13 +43,6 @@ func main() {
 		}
 		log.Printf("Job received: id=%s command=%s", payload.ID, payload.Command)
 
-		go d.HandleJob(payload)
+		go RouteHandler(d, payload)
 	}
-}
-
-func CleanupDaemon() {
-	<-sigChan
-	log.Println("Cleanup daemon...")
-	os.Remove(c.SocketPath)
-	os.Exit(0)
 }
