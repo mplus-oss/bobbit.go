@@ -16,23 +16,8 @@ var (
 )
 
 func init() {
-	cmd.AddCommand(&cobra.Command{
-		Use:   "create <job_id> -- <command>",
-		Short: "Create new job",
-		Args:  cobra.MinimumNArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
-			CreateCommandHandler(args)
-		},
-	})
-
-	cmd.AddCommand(&cobra.Command{
-		Use:   "is-running",
-		Short: "Check if bobbit daemon is running.",
-		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			CheckDaemonHandler()
-		},
-	})
+	RegisterCreateCommand()
+	RegisterDaemonCommand()
 }
 
 func main() {
