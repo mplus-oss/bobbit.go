@@ -34,13 +34,16 @@ func RegisterCreateCommand() {
 			}
 			defer conn.Connection.Close()
 
-			payload := payload.JobPayload{
+			p := payload.JobPayload{Request: payload.REQUEST_EXECUTE_JOB}
+			req := payload.JobRequestMetadata{
 				ID:       id,
 				Command:  command,
-				Request:  payload.REQUEST_EXECUTE_JOB,
 				Metadata: metadata,
 			}
-			if err := conn.SendPayload(payload); err != nil {
+			if err := p.MarshalMetadata(req); err != nil {
+				shell.Fatalfln(3, "Failed to marshal metadata: %v", err)
+			}
+			if err := conn.SendPayload(p); err != nil {
 				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
 			}
 			shell.Printfln("Job %s created!", id)

@@ -15,15 +15,30 @@ import (
 	"mplus.software/oss/bobbit.go/payload"
 )
 
-func (d *DaemonStruct) HandleJob(payload payload.JobPayload) error {
+func (d *DaemonStruct) HandleJob(jc *JobContext) error {
+	var payload payload.JobRequestMetadata
+	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {
+		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata: %v", err}
+	}
+
 	if payload.ID == "" || len(payload.Command) < 1 {
 		return &DaemonError{"Invalid payload: ID or Command not provided.", nil}
 	}
 
-	lockFile := d.BobbitDaemonConfig.GetLockfilePath(payload)
-	logFile := d.BobbitDaemonConfig.GetLogfilePath(payload)
-	exitCodeFile := d.BobbitDaemonConfig.GetExitCodePath(payload)
-	metadataFile := d.BobbitDaemonConfig.GetMetadataPath(payload)
+	jobPath := func(ext string) string {
+		return filepath.Join(
+			d.DataDir,
+			fmt.Sprintf("%s-%s.%s",
+				jc.Payload.Timestamp.Format(time.RFC3339),
+				payload.ID,
+				ext,
+			),
+		)
+	}
+	lockFile := jobPath("lock")
+	logFile := jobPath("log")
+	exitCodeFile := jobPath("exitcode")
+	metadataFile := jobPath("metadata")
 
 	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
 		return &DaemonPayloadError{"Failed to create lockfile.", payload.ID, err}
