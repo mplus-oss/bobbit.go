@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"time"
 
 	"mplus.software/oss/bobbit.go/config"
 	"mplus.software/oss/bobbit.go/payload"
@@ -50,6 +51,9 @@ func (d *DaemonStruct) GetPayload(conn net.Conn) (payload payload.JobPayload, er
 	}
 	if payload.ID == "" || len(payload.Command) < 1 {
 		return payload, &DaemonError{"Invalid payload: ID or Command not provided.", err}
+	}
+	if payload.Timestamp.IsZero() {
+		payload.Timestamp = time.Now()
 	}
 
 	return payload, nil

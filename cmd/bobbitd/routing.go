@@ -13,5 +13,5 @@ func RouteHandler(d *daemon.DaemonStruct, p payload.JobPayload) {
 		return
 	}
 
-	log.Printf("Outbound request database from job %s: requestIota=%v", p.ID, p.Request)
+	log.Printf("WARNING: Outbound request database from job %s: requestIota=%v", p.ID, p.Request)
 }

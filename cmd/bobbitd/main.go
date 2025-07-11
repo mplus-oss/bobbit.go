@@ -41,7 +41,7 @@ func main() {
 			log.Print(err)
 			continue
 		}
-		log.Printf("Job received: id=%s command=%s", payload.ID, payload.Command)
+		log.Printf("Job received: %+v", payload)
 
 		go RouteHandler(d, payload)
 	}
