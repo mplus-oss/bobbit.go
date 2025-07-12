@@ -6,17 +6,17 @@ import (
 )
 
 type PayloadRequestEnum int32
-
 const (
 	REQUEST_EXECUTE_JOB PayloadRequestEnum = 1 << iota
 	REQUEST_LIST
 	REQUEST_WAIT
 )
 
+type PayloadRegularMetadata map[string]any
 type JobPayload struct {
-	Request   PayloadRequestEnum `json:"request"`
-	Timestamp time.Time          `json:"timestamp"`
-	Metadata  map[string]any     `json:"metadata,omitempty"`
+	Request   PayloadRequestEnum     `json:"request"`
+	Timestamp time.Time              `json:"timestamp"`
+	Metadata  PayloadRegularMetadata `json:"metadata,omitempty"`
 }
 
 func (j *JobPayload) UnmarshalMetadata(target any) error {
