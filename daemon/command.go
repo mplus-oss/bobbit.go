@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"mplus.software/oss/bobbit.go/internal/lib"
 	"mplus.software/oss/bobbit.go/payload"
 )
 
@@ -21,16 +22,24 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata: %v", err}
 	}
 
-	if payload.ID == "" || len(payload.Command) < 1 {
-		return &DaemonError{"Invalid payload: ID or Command not provided.", nil}
+	if payload.JobName == "" || len(payload.Command) < 1 {
+		return &DaemonError{"Invalid payload: JobName or Command not provided.", nil}
+	}
+	if payload.ID == "" {
+		hash, err := lib.GenerateRandomHash(16)
+		if err != nil {
+			return &DaemonError{"Failed to create Hash for job: %v", err}
+		}
+		payload.ID = hash
 	}
 
 	jobPath := func(ext string) string {
 		return filepath.Join(
 			d.DataDir,
-			fmt.Sprintf("%s-%s.%s",
+			fmt.Sprintf("%s-%s-%s.%s",
 				jc.Payload.Timestamp.Format(time.RFC3339),
 				payload.ID,
+				payload.JobName,
 				ext,
 			),
 		)
@@ -40,6 +49,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	exitCodeFile := jobPath("exitcode")
 	metadataFile := jobPath("metadata")
 
+	log.Printf("Entering HandleJob Context: %v", jc)
 	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
 		return &DaemonPayloadError{"Failed to create lockfile.", payload.ID, err}
 	}
@@ -81,7 +91,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	if err := os.WriteFile(exitCodeFile, fmt.Appendf([]byte{}, "%d", exitCode), 0644); err != nil {
 		(&DaemonPayloadError{"Failed to create exitcode file. Please handle it manually.", payload.ID, err}).Warning()
 	}
-	log.Printf("DONE: %s exit=%d", payload.ID, exitCode)
+	log.Printf("DONE: %s %s exit=%d", payload.ID, payload.JobName, exitCode)
 	return nil
 }
 
@@ -98,6 +108,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		return err
 	}
 
+	log.Printf("Entering ListJob Context: %v", jc)
 	jobIDs := make(map[string]bool)
 	for _, file := range files {
 		parts := strings.Split(file.Name(), ".")
@@ -111,7 +122,8 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		jobPath := func(ext string) string { return filepath.Join(d.DataDir, id+ext) }
 
 		status := payload.JobStatus{}
-		status.ID = strings.Join(strings.Split(id, "-")[3:], "-")
+		status.ID = strings.Join(strings.Split(id, "-")[3:4], "-")
+		status.JobName = strings.Join(strings.Split(id, "-")[4:], "-")
 
 		timestamp, err := time.Parse(time.RFC3339, strings.Join(strings.Split(id, "-")[:3], "-"))
 		if err != nil {

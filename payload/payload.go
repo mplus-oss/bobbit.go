@@ -6,6 +6,7 @@ import (
 )
 
 type PayloadRequestEnum int32
+
 const (
 	REQUEST_EXECUTE_JOB PayloadRequestEnum = 1 << iota
 	REQUEST_LIST
