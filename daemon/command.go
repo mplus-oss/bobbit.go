@@ -3,7 +3,9 @@ package daemon
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"sort"
@@ -164,6 +166,18 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	lockFile := d.GenerateJobDataFilename(job, DAEMON_LOCKFILE)
 	log.Printf("Waiting job: %v\n", job)
 	for {
+		oneByte := make([]byte, 1)
+		jc.conn.SetReadDeadline(time.Now().Add(1 * time.Millisecond))
+		if _, err := jc.conn.Read(oneByte); err != io.EOF {
+			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+				log.Printf("Connection closed from client. job=%v\n", job)
+				return err
+			}
+		} else {
+			return &DaemonError{"Connection Error", err}
+		}
+		jc.conn.SetReadDeadline(time.Time{})
+
 		if _, err := os.Stat(lockFile); os.IsNotExist(err) {
 			break
 		}
