@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,4 +63,18 @@ func (d *DaemonStruct) FindJobDataFilename(s payload.JobSearchMetadata) (p paylo
 	}
 
 	return p, nil
+}
+
+func (d *DaemonStruct) ParseExitCode(job payload.JobRequestMetadata) payload.JobStatusEnum {
+	exitCodeBytes, err := os.ReadFile(d.GenerateJobDataFilename(job, DAEMON_EXITCODE))
+	if err != nil {
+		return payload.JOB_NOT_RUNNING
+	}
+
+	code, _ := strconv.Atoi(strings.TrimSpace(string(exitCodeBytes)))
+	if code == 0 {
+		return payload.JOB_FINISH
+	} else {
+		return payload.JOB_FAILED
+	}
 }

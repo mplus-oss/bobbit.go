@@ -7,8 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
 
 	"mplus.software/oss/bobbit.go/internal/lib"
@@ -114,6 +112,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 			continue
 		}
 		status := payload.JobStatus{JobRequestMetadata: metadata}
+		status.Status = d.ParseExitCode(metadata)
 
 		if statusRequest.RequestMeta {
 			if metaBytes, err := os.ReadFile(d.GenerateJobDataFilename(metadata, DAEMON_METADATA)); err == nil {
@@ -126,16 +125,6 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		}
 		if _, err := os.Stat(d.GenerateJobDataFilename(metadata, DAEMON_LOCKFILE)); err == nil {
 			status.Status = payload.JOB_RUNNING
-		}
-		if exitCodeBytes, err := os.ReadFile(d.GenerateJobDataFilename(metadata, DAEMON_EXITCODE)); err == nil {
-			// TODO: Create self function for this
-			code, _ := strconv.Atoi(strings.TrimSpace(string(exitCodeBytes)))
-			status.ExitCode = code
-			if code == 0 {
-				status.Status = payload.JOB_FINISH
-			} else {
-				status.Status = payload.JOB_FAILED
-			}
 		}
 
 		allJobs = append(allJobs, status)
@@ -181,18 +170,9 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	// TODO: Create self function for this
-	if exitCodeBytes, err := os.ReadFile(d.GenerateJobDataFilename(job, DAEMON_EXITCODE)); err == nil {
-		code, _ := strconv.Atoi(strings.TrimSpace(string(exitCodeBytes)))
-		if code == 0 {
-			if err := jc.SendPayload(payload.JobStatus{Status: payload.JOB_FINISH}); err != nil {
-				return err
-			}
-		} else {
-			if err := jc.SendPayload(payload.JobStatus{Status: payload.JOB_FAILED}); err != nil {
-				return err
-			}
-		}
+	finalStatus := d.ParseExitCode(job)
+	if err := jc.SendPayload(payload.JobStatus{Status: finalStatus}); err != nil {
+		return err
 	}
 
 	log.Printf("Job waiting finish: %v\n", job)
