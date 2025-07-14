@@ -17,6 +17,10 @@ func RouteHandler(d *daemon.DaemonStruct, jc *daemon.JobContext) {
 		if err := d.ListJob(jc); err != nil {
 			log.Println(err)
 		}
+	case payload.REQUEST_WAIT:
+		if err := d.WaitJob(jc); err != nil {
+			log.Println(err)
+		}
 	default:
 		log.Printf("WARNING: Outbound request: %+v", jc)
 	}
