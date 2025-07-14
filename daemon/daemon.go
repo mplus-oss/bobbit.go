@@ -11,6 +11,15 @@ import (
 	"mplus.software/oss/bobbit.go/payload"
 )
 
+type DaemonFileTypeEnum string
+
+const (
+	DAEMON_LOCKFILE DaemonFileTypeEnum = "lockfile"
+	DAEMON_LOGFILE  DaemonFileTypeEnum = "log"
+	DAEMON_METADATA DaemonFileTypeEnum = "metadata"
+	DAEMON_EXITCODE DaemonFileTypeEnum = "exitcode"
+)
+
 type DaemonStruct struct {
 	SocketListener net.Listener
 	config.BobbitDaemonConfig

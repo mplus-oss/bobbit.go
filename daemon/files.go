@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"mplus.software/oss/bobbit.go/payload"
 )
 
-func (d *DaemonStruct) GenerateJobDataFilename(p payload.JobRequestMetadata, extFile string) string {
+func (d *DaemonStruct) GenerateJobDataFilename(p payload.JobRequestMetadata, extFile DaemonFileTypeEnum) string {
 	return filepath.Join(
 		d.DataDir,
 		fmt.Sprintf("%s-%s-%s.%s", p.Timestamp.Format(time.RFC3339Nano), p.ID, p.JobName, extFile),
@@ -62,4 +63,18 @@ func (d *DaemonStruct) FindJobDataFilename(s payload.JobSearchMetadata) (p paylo
 	}
 
 	return p, nil
+}
+
+func (d *DaemonStruct) ParseExitCode(job payload.JobRequestMetadata) payload.JobStatusEnum {
+	exitCodeBytes, err := os.ReadFile(d.GenerateJobDataFilename(job, DAEMON_EXITCODE))
+	if err != nil {
+		return payload.JOB_NOT_RUNNING
+	}
+
+	code, _ := strconv.Atoi(strings.TrimSpace(string(exitCodeBytes)))
+	if code == 0 {
+		return payload.JOB_FINISH
+	} else {
+		return payload.JOB_FAILED
+	}
 }

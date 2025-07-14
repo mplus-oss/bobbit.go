@@ -41,6 +41,8 @@ func RegisterWaitCommand() {
 					status = "Failed"
 				case payload.JOB_FINISH:
 					status = "Finished"
+				case payload.JOB_NOT_RUNNING:
+					status = "Not running"
 				}
 				shell.Printfln("Job %s is finished with status \"%s\".", args[0], status)
 			}
