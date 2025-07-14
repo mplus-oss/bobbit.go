@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"mplus.software/oss/bobbit.go/internal/lib"
 	"mplus.software/oss/bobbit.go/payload"
@@ -32,22 +31,14 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 		}
 		payload.ID = hash
 	}
-
-	jobPath := func(ext string) string {
-		return filepath.Join(
-			d.DataDir,
-			fmt.Sprintf("%s-%s-%s.%s",
-				jc.Payload.Timestamp.Format(time.RFC3339),
-				payload.ID,
-				payload.JobName,
-				ext,
-			),
-		)
+	if payload.Timestamp.IsZero() {
+		payload.Timestamp = jc.Payload.Timestamp
 	}
-	lockFile := jobPath("lock")
-	logFile := jobPath("log")
-	exitCodeFile := jobPath("exitcode")
-	metadataFile := jobPath("metadata")
+
+	lockFile := d.GenerateJobDataFilename(payload, "lock")
+	logFile := d.GenerateJobDataFilename(payload, "log")
+	exitCodeFile := d.GenerateJobDataFilename(payload, "exitcode")
+	metadataFile := d.GenerateJobDataFilename(payload, "metadata")
 
 	log.Printf("Entering HandleJob Context: %v", jc)
 	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
@@ -121,20 +112,20 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	for id := range jobIDs {
 		jobPath := func(ext string) string { return filepath.Join(d.DataDir, id+ext) }
 
-		status := payload.JobStatus{}
-		status.ID = strings.Join(strings.Split(id, "-")[3:4], "-")
-		status.JobName = strings.Join(strings.Split(id, "-")[4:], "-")
-
-		timestamp, err := time.Parse(time.RFC3339, strings.Join(strings.Split(id, "-")[:3], "-"))
+		metadata, err := d.ParseJobDataFilename(id)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		status.Timestamp = timestamp
+		status := payload.JobStatus{JobRequestMetadata: metadata}
 
 		if statusRequest.RequestMeta {
 			if metaBytes, err := os.ReadFile(jobPath(".metadata")); err == nil {
-				json.Unmarshal(metaBytes, &status.Metadata)
+				err := json.Unmarshal(metaBytes, &status.Metadata)
+				if err != nil {
+					log.Printf("Failed to unmarshal metadata from %s job: %v", id, err)
+					continue
+				}
 			}
 		}
 		if _, err := os.Stat(jobPath(".lock")); err == nil {
