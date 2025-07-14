@@ -102,10 +102,8 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	log.Printf("Entering ListJob Context: %v", jc)
 	jobIDs := make(map[string]bool)
 	for _, file := range files {
-		parts := strings.Split(file.Name(), ".")
-		if len(parts) > 1 {
-			jobIDs[parts[0]] = true
-		}
+		jobfile := d.SplitFilenameFromExtfile(file.Name())
+		jobIDs[jobfile] = true
 	}
 
 	allJobs := []payload.JobStatus{}
