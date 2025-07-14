@@ -10,7 +10,7 @@ import (
 	"mplus.software/oss/bobbit.go/payload"
 )
 
-func (d *DaemonStruct) GenerateJobDataFilename(p payload.JobRequestMetadata, extFile string) string {
+func (d *DaemonStruct) GenerateJobDataFilename(p payload.JobRequestMetadata, extFile DaemonFileTypeEnum) string {
 	return filepath.Join(
 		d.DataDir,
 		fmt.Sprintf("%s-%s-%s.%s", p.Timestamp.Format(time.RFC3339Nano), p.ID, p.JobName, extFile),

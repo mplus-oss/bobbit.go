@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,10 +35,10 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 		payload.Timestamp = jc.Payload.Timestamp
 	}
 
-	lockFile := d.GenerateJobDataFilename(payload, "lock")
-	logFile := d.GenerateJobDataFilename(payload, "log")
-	exitCodeFile := d.GenerateJobDataFilename(payload, "exitcode")
-	metadataFile := d.GenerateJobDataFilename(payload, "metadata")
+	lockFile := d.GenerateJobDataFilename(payload, DAEMON_LOCKFILE)
+	logFile := d.GenerateJobDataFilename(payload, DAEMON_LOGFILE)
+	exitCodeFile := d.GenerateJobDataFilename(payload, DAEMON_EXITCODE)
+	metadataFile := d.GenerateJobDataFilename(payload, DAEMON_METADATA)
 
 	log.Printf("Entering HandleJob Context: %v", jc)
 	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
@@ -109,8 +108,6 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 
 	allJobs := []payload.JobStatus{}
 	for id := range jobIDs {
-		jobPath := func(ext string) string { return filepath.Join(d.DataDir, id+ext) }
-
 		metadata, err := d.ParseJobDataFilename(id)
 		if err != nil {
 			log.Println(err)
@@ -119,7 +116,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		status := payload.JobStatus{JobRequestMetadata: metadata}
 
 		if statusRequest.RequestMeta {
-			if metaBytes, err := os.ReadFile(jobPath(".metadata")); err == nil {
+			if metaBytes, err := os.ReadFile(d.GenerateJobDataFilename(metadata, DAEMON_METADATA)); err == nil {
 				err := json.Unmarshal(metaBytes, &status.Metadata)
 				if err != nil {
 					log.Printf("Failed to unmarshal metadata from %s job: %v", id, err)
@@ -127,10 +124,10 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 				}
 			}
 		}
-		if _, err := os.Stat(jobPath(".lock")); err == nil {
+		if _, err := os.Stat(d.GenerateJobDataFilename(metadata, DAEMON_LOCKFILE)); err == nil {
 			status.Status = payload.JOB_RUNNING
 		}
-		if exitCodeBytes, err := os.ReadFile(jobPath(".exitcode")); err == nil {
+		if exitCodeBytes, err := os.ReadFile(d.GenerateJobDataFilename(metadata, DAEMON_EXITCODE)); err == nil {
 			// TODO: Create self function for this
 			code, _ := strconv.Atoi(strings.TrimSpace(string(exitCodeBytes)))
 			status.ExitCode = code
@@ -175,7 +172,7 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 		}
 	}
 
-	lockFile := d.GenerateJobDataFilename(job, "lock")
+	lockFile := d.GenerateJobDataFilename(job, DAEMON_LOCKFILE)
 	log.Printf("Waiting job: %v\n", job)
 	for {
 		if _, err := os.Stat(lockFile); os.IsNotExist(err) {
@@ -185,7 +182,7 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	}
 
 	// TODO: Create self function for this
-	if exitCodeBytes, err := os.ReadFile(d.GenerateJobDataFilename(job, "exitcode")); err == nil {
+	if exitCodeBytes, err := os.ReadFile(d.GenerateJobDataFilename(job, DAEMON_EXITCODE)); err == nil {
 		code, _ := strconv.Atoi(strings.TrimSpace(string(exitCodeBytes)))
 		if code == 0 {
 			if err := jc.SendPayload(payload.JobStatus{Status: payload.JOB_FINISH}); err != nil {
