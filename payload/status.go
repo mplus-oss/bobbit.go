@@ -6,6 +6,7 @@ const (
 	JOB_RUNNING JobStatusEnum = 1 << iota
 	JOB_FINISH
 	JOB_FAILED
+	JOB_NOT_RUNNING
 )
 
 type JobStatus struct {
