@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
+	"mplus.software/oss/bobbit.go/internal/lib"
 	"mplus.software/oss/bobbit.go/payload"
 )
 
@@ -21,25 +21,26 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata: %v", err}
 	}
 
-	if payload.ID == "" || len(payload.Command) < 1 {
-		return &DaemonError{"Invalid payload: ID or Command not provided.", nil}
+	if payload.JobName == "" || len(payload.Command) < 1 {
+		return &DaemonError{"Invalid payload: JobName or Command not provided.", nil}
+	}
+	if payload.ID == "" {
+		hash, err := lib.GenerateRandomHash(16)
+		if err != nil {
+			return &DaemonError{"Failed to create Hash for job: %v", err}
+		}
+		payload.ID = hash
+	}
+	if payload.Timestamp.IsZero() {
+		payload.Timestamp = jc.Payload.Timestamp
 	}
 
-	jobPath := func(ext string) string {
-		return filepath.Join(
-			d.DataDir,
-			fmt.Sprintf("%s-%s.%s",
-				jc.Payload.Timestamp.Format(time.RFC3339),
-				payload.ID,
-				ext,
-			),
-		)
-	}
-	lockFile := jobPath("lock")
-	logFile := jobPath("log")
-	exitCodeFile := jobPath("exitcode")
-	metadataFile := jobPath("metadata")
+	lockFile := d.GenerateJobDataFilename(payload, "lock")
+	logFile := d.GenerateJobDataFilename(payload, "log")
+	exitCodeFile := d.GenerateJobDataFilename(payload, "exitcode")
+	metadataFile := d.GenerateJobDataFilename(payload, "metadata")
 
+	log.Printf("Entering HandleJob Context: %v", jc)
 	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
 		return &DaemonPayloadError{"Failed to create lockfile.", payload.ID, err}
 	}
@@ -81,7 +82,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	if err := os.WriteFile(exitCodeFile, fmt.Appendf([]byte{}, "%d", exitCode), 0644); err != nil {
 		(&DaemonPayloadError{"Failed to create exitcode file. Please handle it manually.", payload.ID, err}).Warning()
 	}
-	log.Printf("DONE: %s exit=%d", payload.ID, exitCode)
+	log.Printf("DONE: %s %s exit=%d", payload.ID, payload.JobName, exitCode)
 	return nil
 }
 
@@ -98,6 +99,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		return err
 	}
 
+	log.Printf("Entering ListJob Context: %v", jc)
 	jobIDs := make(map[string]bool)
 	for _, file := range files {
 		parts := strings.Split(file.Name(), ".")
@@ -110,19 +112,20 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	for id := range jobIDs {
 		jobPath := func(ext string) string { return filepath.Join(d.DataDir, id+ext) }
 
-		status := payload.JobStatus{}
-		status.ID = strings.Join(strings.Split(id, "-")[3:], "-")
-
-		timestamp, err := time.Parse(time.RFC3339, strings.Join(strings.Split(id, "-")[:3], "-"))
+		metadata, err := d.ParseJobDataFilename(id)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		status.Timestamp = timestamp
+		status := payload.JobStatus{JobRequestMetadata: metadata}
 
 		if statusRequest.RequestMeta {
 			if metaBytes, err := os.ReadFile(jobPath(".metadata")); err == nil {
-				json.Unmarshal(metaBytes, &status.Metadata)
+				err := json.Unmarshal(metaBytes, &status.Metadata)
+				if err != nil {
+					log.Printf("Failed to unmarshal metadata from %s job: %v", id, err)
+					continue
+				}
 			}
 		}
 		if _, err := os.Stat(jobPath(".lock")); err == nil {
