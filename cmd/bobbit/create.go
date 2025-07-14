@@ -11,11 +11,11 @@ import (
 
 func RegisterCreateCommand() {
 	create := &cobra.Command{
-		Use:   "create <job_id> -- <command>",
+		Use:   "create <job_name> -- <command>",
 		Short: "Create new job",
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			id, command := args[0], args[1:]
+			jobName, command := args[0], args[1:]
 
 			var metadata map[string]any
 			metadataStr, err := cmd.Flags().GetString("metadata")
@@ -36,7 +36,7 @@ func RegisterCreateCommand() {
 
 			p := payload.JobPayload{Request: payload.REQUEST_EXECUTE_JOB}
 			req := payload.JobRequestMetadata{
-				ID:       id,
+				JobName:  jobName,
 				Command:  command,
 				Metadata: metadata,
 			}
@@ -46,7 +46,7 @@ func RegisterCreateCommand() {
 			if err := conn.SendPayload(p); err != nil {
 				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
 			}
-			shell.Printfln("Job %s created!", id)
+			shell.Printfln("Job %s created!", jobName)
 		},
 	}
 	create.Flags().StringP("metadata", "m", "", "JSON Metadata")
