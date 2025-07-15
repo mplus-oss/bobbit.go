@@ -11,6 +11,7 @@ const (
 	REQUEST_EXECUTE_JOB PayloadRequestEnum = 1 << iota
 	REQUEST_LIST
 	REQUEST_WAIT
+	REQUEST_STATUS
 )
 
 type PayloadRegularMetadata map[string]any

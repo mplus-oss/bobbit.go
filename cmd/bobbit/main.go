@@ -20,6 +20,7 @@ func init() {
 	RegisterDaemonCommand()
 	RegisterListCommand()
 	RegisterWaitCommand()
+	RegisterStatusCommand()
 }
 
 func main() {
