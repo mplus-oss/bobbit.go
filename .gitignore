@@ -18,3 +18,6 @@ go.work.sum
 .idea/
 .vscode/
 .vimsession
+
+# Build file
+build/dist/*
