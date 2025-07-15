@@ -1,0 +1,51 @@
+name: Build to binary
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sanity check
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          echo "::group:: Check git reference type"
+          if [ "${{ github.ref_type }}" != "tag" ]; then
+            echo "Error: Git reference type for dispatch expects \"tag\", but \"${{ github.ref_type }}\" is provided."
+            echo "Exiting..."
+            exit 1
+          fi
+          echo "PASS"
+          echo "::endgroup::"
+      - name: Checkout repo
+        uses: https://github.com/actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.ref_name }}
+      - name: Build file
+        run: ./build/binary/compile-docker.sh
+      - name: Upload artifact
+        uses: https://github.com/actions/upload-artifact@v4
+        with:
+          name: bobbit-dist
+          path: ./build/dist/
+
+  draft-release:
+    needs:
+      - build
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: https://github.com/actions/download-artifact@v4
+        with:
+          name: bobbit-dist
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: bobbit-dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
