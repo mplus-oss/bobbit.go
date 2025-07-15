@@ -11,8 +11,8 @@ import (
 	"sort"
 	"time"
 
-	"mplus.software/oss/bobbit.go/internal/lib"
-	"mplus.software/oss/bobbit.go/payload"
+	"github.com/mplus-oss/bobbit.go/internal/lib"
+	"github.com/mplus-oss/bobbit.go/payload"
 )
 
 func (d *DaemonStruct) HandleJob(jc *JobContext) error {

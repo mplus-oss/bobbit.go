@@ -3,7 +3,7 @@ package client
 import (
 	"fmt"
 
-	"mplus.software/oss/bobbit.go/config"
+	"github.com/mplus-oss/bobbit.go/config"
 )
 
 type DaemonNotRunningError struct {

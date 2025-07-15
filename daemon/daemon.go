@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"mplus.software/oss/bobbit.go/config"
-	"mplus.software/oss/bobbit.go/payload"
+	"github.com/mplus-oss/bobbit.go/config"
+	"github.com/mplus-oss/bobbit.go/payload"
 )
 
 type DaemonFileTypeEnum string

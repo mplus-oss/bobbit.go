@@ -1,10 +1,10 @@
 package main
 
 import (
+	"github.com/mplus-oss/bobbit.go/client"
+	"github.com/mplus-oss/bobbit.go/internal/shell"
+	"github.com/mplus-oss/bobbit.go/payload"
 	"github.com/spf13/cobra"
-	"mplus.software/oss/bobbit.go/client"
-	"mplus.software/oss/bobbit.go/internal/shell"
-	"mplus.software/oss/bobbit.go/payload"
 )
 
 func RegisterWaitCommand() {

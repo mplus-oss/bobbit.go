@@ -1,6 +1,6 @@
 package config
 
-import "mplus.software/oss/bobbit.go/internal/lib"
+import "github.com/mplus-oss/bobbit.go/internal/lib"
 
 type BobbitDaemonConfig struct {
 	DataDir string

@@ -3,7 +3,7 @@ package config
 import (
 	"os"
 
-	"mplus.software/oss/bobbit.go/internal/lib"
+	"github.com/mplus-oss/bobbit.go/internal/lib"
 )
 
 type BobbitClientConfig struct {

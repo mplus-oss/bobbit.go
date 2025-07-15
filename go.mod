@@ -1,4 +1,4 @@
-module mplus.software/oss/bobbit.go
+module github.com/mplus-oss/bobbit.go
 
 go 1.24.2
 

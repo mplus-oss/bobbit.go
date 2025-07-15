@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net"
 
-	"mplus.software/oss/bobbit.go/config"
+	"github.com/mplus-oss/bobbit.go/config"
 )
 
 type DaemonConnectionStruct struct {

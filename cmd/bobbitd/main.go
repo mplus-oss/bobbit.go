@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"mplus.software/oss/bobbit.go/config"
-	"mplus.software/oss/bobbit.go/daemon"
+	"github.com/mplus-oss/bobbit.go/config"
+	"github.com/mplus-oss/bobbit.go/daemon"
 )
 
 var (

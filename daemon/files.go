@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"mplus.software/oss/bobbit.go/payload"
+	"github.com/mplus-oss/bobbit.go/payload"
 )
 
 func (d *DaemonStruct) GenerateJobDataFilename(p payload.JobRequestMetadata, extFile DaemonFileTypeEnum) string {

@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"mplus.software/oss/bobbit.go/daemon"
-	"mplus.software/oss/bobbit.go/payload"
+	"github.com/mplus-oss/bobbit.go/daemon"
+	"github.com/mplus-oss/bobbit.go/payload"
 )
 
 func RouteHandler(d *daemon.DaemonStruct, jc *daemon.JobContext) {

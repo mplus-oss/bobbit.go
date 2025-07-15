@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
+	"github.com/mplus-oss/bobbit.go/config"
 	"github.com/spf13/cobra"
-	"mplus.software/oss/bobbit.go/config"
 )
 
 var (
