@@ -18,14 +18,14 @@ jobs:
           echo "PASS"
           echo "::endgroup::"
       - name: Checkout repo
-        uses: https://github.com/actions/checkout@v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
           ref: ${{ github.ref_name }}
       - name: Build file
         run: ./build/binary/compile-docker.sh
       - name: Upload artifact
-        uses: https://github.com/actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: bobbit-dist
           path: ./build/dist/
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifact
-        uses: https://github.com/actions/download-artifact@v4
+        uses: actions/download-artifact@v4
         with:
           name: bobbit-dist
       - name: Create Draft Release
