@@ -24,6 +24,7 @@ jobs:
           ref: ${{ github.ref_name }}
       - name: Build file
         run: ./build/binary/containerized-compile.sh
+      - run: ls -lah ./build/dist/
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -41,6 +42,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bobbit-dist
+          path: .
+      - run: ls -lah *
       - name: Create Draft Release
         uses: softprops/action-gh-release@v2
         with:
