@@ -192,3 +192,30 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	log.Printf("Job waiting finish: %v\n", job)
 	return nil
 }
+
+func (d *DaemonStruct) StatusJob(jc *JobContext) error {
+	p := jc.Payload
+
+	var statusRequest payload.JobSearchMetadata
+	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
+		return err
+	}
+
+	job, err := d.FindJobDataFilename(statusRequest)
+	if err != nil {
+		return err
+	}
+
+	if job.ID == "" {
+		if err := jc.SendPayload(payload.JobStatus{Status: payload.JOB_NOT_RUNNING}); err != nil {
+			return err
+		}
+	}
+
+	finalStatus := d.ParseExitCode(job)
+	if err := jc.SendPayload(payload.JobStatus{Status: finalStatus, JobRequestMetadata: job}); err != nil {
+		return err
+	}
+
+	return nil
+}
