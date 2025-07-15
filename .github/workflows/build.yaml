@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 1
           ref: ${{ github.ref_name }}
       - name: Build file
-        run: ./build/binary/compile-docker.sh
+        run: ./build/binary/containerized-compile.sh
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
