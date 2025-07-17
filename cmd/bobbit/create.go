@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 
-	"github.com/mplus-oss/bobbit.go/client"
 	"github.com/mplus-oss/bobbit.go/internal/shell"
 	"github.com/mplus-oss/bobbit.go/payload"
 	"github.com/spf13/cobra"
@@ -28,22 +27,18 @@ func RegisterCreateCommand() {
 				}
 			}
 
-			conn, err := client.CreateConnection(c)
-			if err != nil {
-				shell.Fatalfln(3, "%v", err)
-			}
-			defer conn.Connection.Close()
-
 			p := payload.JobPayload{Request: payload.REQUEST_EXECUTE_JOB}
 			req := payload.JobRequestMetadata{
 				JobName:  jobName,
 				Command:  command,
 				Metadata: metadata,
 			}
-			if err := p.MarshalMetadata(req); err != nil {
-				shell.Fatalfln(3, "Failed to marshal metadata: %v", err)
+			if err := cli.BuildPayload(&p, req); err != nil {
+				shell.Fatalfln(3, "Failed to build payload: %v", err)
 			}
-			if err := conn.SendPayload(p); err != nil {
+			defer cli.Connection.Close()
+
+			if err := cli.SendPayload(p); err != nil {
 				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
 			}
 			shell.Printfln("Job %s created!", jobName)
