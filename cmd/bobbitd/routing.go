@@ -9,6 +9,10 @@ import (
 
 func RouteHandler(d *daemon.DaemonStruct, jc *daemon.JobContext) {
 	switch r := jc.Payload.Request; r {
+	case payload.REQUEST_VIBE_CHECK:
+		if err := d.HandleVibeCheck(jc); err != nil {
+			log.Println(err)
+		}
 	case payload.REQUEST_EXECUTE_JOB:
 		if err := d.HandleJob(jc); err != nil {
 			log.Println(err)
