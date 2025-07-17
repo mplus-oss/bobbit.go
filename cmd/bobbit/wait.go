@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/mplus-oss/bobbit.go/client"
 	"github.com/mplus-oss/bobbit.go/internal/shell"
 	"github.com/mplus-oss/bobbit.go/payload"
 	"github.com/spf13/cobra"
@@ -14,23 +13,18 @@ func RegisterWaitCommand() {
 		Long:  "Wait for job. If user provide jobName that have same name, it will using the latest job.",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			conn, err := client.CreateConnection(c)
-			if err != nil {
-				shell.Fatalfln(3, "%v", err)
-			}
-			defer conn.Connection.Close()
-
 			p := payload.JobPayload{Request: payload.REQUEST_WAIT}
-			if err := p.MarshalMetadata(payload.JobSearchMetadata{Search: args[0]}); err != nil {
-				shell.Fatalfln(3, "Failed to marshal metadata. %v", err)
+			if err := cli.BuildPayload(&p, payload.JobSearchMetadata{Search: args[0]}); err != nil {
+				shell.Fatalfln(3, "Failed to build payload: %v", err)
 			}
+			defer cli.Connection.Close()
 
-			if err := conn.SendPayload(p); err != nil {
+			if err := cli.SendPayload(p); err != nil {
 				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
 			}
 
 			var job payload.JobStatus
-			if err := conn.GetPayload(&job); err != nil {
+			if err := cli.GetPayload(&job); err != nil {
 				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
 			}
 

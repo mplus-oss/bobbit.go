@@ -6,7 +6,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/mplus-oss/bobbit.go/client"
 	"github.com/mplus-oss/bobbit.go/internal/shell"
 	"github.com/mplus-oss/bobbit.go/payload"
 	"github.com/spf13/cobra"
@@ -17,23 +16,17 @@ func RegisterListCommand() {
 		Use:   "list",
 		Short: "List of job",
 		Run: func(cmd *cobra.Command, args []string) {
-			conn, err := client.CreateConnection(c)
-			if err != nil {
-				shell.Fatalfln(3, "%v", err)
-			}
-			defer conn.Connection.Close()
-
 			p := payload.JobPayload{Request: payload.REQUEST_LIST}
-			if err := p.MarshalMetadata(payload.JobStatusMetadata{RequestMeta: false}); err != nil {
-				shell.Fatalfln(3, "Failed to marshal metadata. %v", err)
+			if err := cli.BuildPayload(&p, payload.JobStatusMetadata{RequestMeta: false}); err != nil {
+				shell.Fatalfln(3, "Failed to build payload: %v", err)
 			}
 
-			if err := conn.SendPayload(p); err != nil {
+			if err := cli.SendPayload(p); err != nil {
 				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
 			}
 
 			var jobs []payload.JobStatus
-			if err := conn.GetPayload(&jobs); err != nil {
+			if err := cli.GetPayload(&jobs); err != nil {
 				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
 			}
 

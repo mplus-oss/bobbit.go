@@ -5,19 +5,34 @@ import (
 	"net"
 
 	"github.com/mplus-oss/bobbit.go/config"
+	"github.com/mplus-oss/bobbit.go/payload"
 )
 
 type DaemonConnectionStruct struct {
 	Connection net.Conn
+	config.BobbitClientConfig
 }
 
-func CreateConnection(c config.BobbitClientConfig) (*DaemonConnectionStruct, error) {
-	conn, err := net.Dial("unix", c.SocketPath)
-	if err != nil {
-		return &DaemonConnectionStruct{}, &DaemonNotRunningError{err, c}
+func New(c config.BobbitClientConfig) *DaemonConnectionStruct {
+	return &DaemonConnectionStruct{
+		BobbitClientConfig: c,
 	}
+}
 
-	return &DaemonConnectionStruct{Connection: conn}, nil
+func (d *DaemonConnectionStruct) BuildPayload(p *payload.JobPayload, metadata any) error {
+	conn, err := net.Dial("unix", d.BobbitClientConfig.SocketPath)
+	if err != nil {
+		conn.Close()
+		return err
+	}
+	d.Connection = conn
+
+	if err := p.MarshalMetadata(metadata); err != nil {
+		d.Connection.Close()
+		return err
+	}
+	
+	return nil
 }
 
 func (d *DaemonConnectionStruct) SendPayload(target any) error {
