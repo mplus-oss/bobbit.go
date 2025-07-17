@@ -15,6 +15,14 @@ import (
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
+func (d *DaemonStruct) HandleVibeCheck(jc *JobContext) error {
+	var payload payload.PayloadRegularMetadata
+	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {
+		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata.", err}
+	}
+	return nil
+}
+
 func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	var payload payload.JobRequestMetadata
 	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {

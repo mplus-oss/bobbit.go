@@ -12,6 +12,7 @@ const (
 	REQUEST_LIST
 	REQUEST_WAIT
 	REQUEST_STATUS
+	REQUEST_VIBE_CHECK
 )
 
 type PayloadRegularMetadata map[string]any
