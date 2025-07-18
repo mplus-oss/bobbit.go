@@ -15,14 +15,14 @@ import (
 func GenerateJobDataFilename(c config.BobbitConfig, p payload.JobDetailMetadata, extFile DaemonFileTypeEnum) string {
 	return filepath.Join(
 		c.DataDir,
-		fmt.Sprintf("%s-%s-%s.%s", p.Timestamp.Format(time.RFC3339Nano), p.ID, p.JobName, extFile),
+		fmt.Sprintf("%d-%s-%s.%s", p.Timestamp.UnixMilli(), p.ID, p.JobName, extFile),
 	)
 }
 
 func SplitFilenameFromExtfile(filename string) string {
 	var file string
-	if filesplit := strings.Split(filename, "."); len(filesplit) > 2 {
-		file = strings.Join(filesplit[0:2], ".")
+	if filesplit := strings.Split(filename, "."); len(filesplit) > 1 {
+		file = strings.Join(filesplit[:len(filesplit)-1], ".")
 	} else {
 		file = filename
 	}
@@ -31,14 +31,16 @@ func SplitFilenameFromExtfile(filename string) string {
 
 func ParseJobDataFilename(filename string) (p payload.JobDetailMetadata, err error) {
 	file := SplitFilenameFromExtfile(filename)
+	fileSplit := strings.Split(file, "-")
 
-	p.ID = strings.Join(strings.Split(file, "-")[3:4], "-")
-	p.JobName = strings.Join(strings.Split(file, "-")[4:], "-")
-	timestamp, err := time.Parse(time.RFC3339Nano, strings.Join(strings.Split(file, "-")[:3], "-"))
+	p.ID = strings.Join(fileSplit[1:2], "-")
+	p.JobName = strings.Join(fileSplit[2:], "-")
+
+	time64, err := strconv.ParseInt(fileSplit[0], 10, 64)
 	if err != nil {
 		return p, err
 	}
-	p.Timestamp = timestamp
+	p.Timestamp = time.UnixMilli(time64)
 
 	return p, nil
 }
