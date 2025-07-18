@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	c       = config.NewDaemon()
+	c       = config.New()
 	sigChan = make(chan os.Signal, 1)
 )
 
 func main() {
 	log.Printf("Directory data: %s", c.DataDir)
-	log.Printf("Socket Path: %s", c.BobbitClientConfig.SocketPath)
+	log.Printf("Socket Path: %s", c.SocketPath)
 
 	d, err := daemon.CreateDaemon(c)
 	if err != nil {
