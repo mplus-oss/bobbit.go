@@ -30,6 +30,12 @@ func SplitFilenameFromExtfile(filename string) string {
 }
 
 func ParseJobDataFilename(filename string) (p payload.JobDetailMetadata, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("Failed to parsing filename, format not supported: %v", r)
+		}
+	}()
+
 	file := SplitFilenameFromExtfile(filename)
 	fileSplit := strings.Split(file, "-")
 
