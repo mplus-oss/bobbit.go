@@ -12,12 +12,21 @@ import (
 )
 
 func RegisterListCommand() {
-	cmd.AddCommand(&cobra.Command{
+	list := &cobra.Command{
 		Use:   "list",
 		Short: "List of job",
 		Run: func(cmd *cobra.Command, args []string) {
+			activeOnly, err := cmd.Flags().GetBool("active-only")
+			if err != nil {
+				shell.Fatalfln(3, "%v", err)
+			}
+
 			p := payload.JobPayload{Request: payload.REQUEST_LIST}
-			if err := cli.BuildPayload(&p, payload.JobSearchMetadata{RequestMeta: false}); err != nil {
+			req := payload.JobSearchMetadata{
+				RequestMeta: false,
+				ActiveOnly:  activeOnly,
+			}
+			if err := cli.BuildPayload(&p, req); err != nil {
 				shell.Fatalfln(3, "Failed to build payload: %v", err)
 			}
 
@@ -56,5 +65,7 @@ func RegisterListCommand() {
 				shell.Fatalfln(3, "Failed to print table: %v", err)
 			}
 		},
-	})
+	}
+	list.Flags().Bool("active-only", false, "List only for job with running/active status")
+	cmd.AddCommand(list)
 }

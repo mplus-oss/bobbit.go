@@ -10,12 +10,17 @@ import (
 )
 
 func RegisterStatusCommand() {
-	cmd.AddCommand(&cobra.Command{
+	status := &cobra.Command{
 		Use:   "status <jobID|jobName>",
 		Short: "Check status from specific job.",
 		Long:  "Check status from specific job. If user provide jobName that have same name, it will using the latest job.",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			showMetadata, err := cmd.Flags().GetBool("show-metadata")
+			if err != nil {
+				shell.Fatalfln(3, "%v", err)
+			}
+
 			p := payload.JobPayload{Request: payload.REQUEST_STATUS}
 			if err := cli.BuildPayload(&p, payload.JobSearchMetadata{Search: args[0]}); err != nil {
 				shell.Fatalfln(3, "Failed to build payload: %v", err)
@@ -49,12 +54,14 @@ func RegisterStatusCommand() {
 			shell.Printf("  Status:    %s\n", status)
 			shell.Printf("  Exit Code: %d\n", job.ExitCode)
 			shell.Printf("  Timestamp: %s\n", job.Timestamp.Format(time.RFC3339))
-			if job.Metadata != nil {
+			if showMetadata && job.Metadata != nil {
 				metaBytes, err := json.MarshalIndent(job.Metadata, "", "  ")
 				if err == nil {
 					shell.Printf("  Metadata:\n%s\n", string(metaBytes))
 				}
 			}
 		},
-	})
+	}
+	status.Flags().Bool("show-metadata", false, "Show metadata")
+	cmd.AddCommand(status)
 }
