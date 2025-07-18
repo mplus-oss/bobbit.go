@@ -23,7 +23,7 @@ func RegisterWaitCommand() {
 				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
 			}
 
-			var job payload.JobStatus
+			var job payload.JobResponse
 			if err := cli.GetPayload(&job); err != nil {
 				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
 			}

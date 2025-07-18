@@ -28,7 +28,7 @@ func RegisterCreateCommand() {
 			}
 
 			p := payload.JobPayload{Request: payload.REQUEST_EXECUTE_JOB}
-			req := payload.JobRequestMetadata{
+			req := payload.JobDetailMetadata{
 				JobName:  jobName,
 				Command:  command,
 				Metadata: metadata,
