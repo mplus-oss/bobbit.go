@@ -20,13 +20,8 @@ func GenerateJobDataFilename(c config.BobbitConfig, p payload.JobDetailMetadata,
 }
 
 func SplitFilenameFromExtfile(filename string) string {
-	var file string
-	if filesplit := strings.Split(filename, "."); len(filesplit) > 1 {
-		file = strings.Join(filesplit[:len(filesplit)-1], ".")
-	} else {
-		file = filename
-	}
-	return file
+	ext := filepath.Ext(filename)
+	return strings.TrimSuffix(filename, ext)
 }
 
 func ParseJobDataFilename(filename string) (p payload.JobDetailMetadata, err error) {
