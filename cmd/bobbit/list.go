@@ -17,7 +17,7 @@ func RegisterListCommand() {
 		Short: "List of job",
 		Run: func(cmd *cobra.Command, args []string) {
 			p := payload.JobPayload{Request: payload.REQUEST_LIST}
-			if err := cli.BuildPayload(&p, payload.JobStatusMetadata{RequestMeta: false}); err != nil {
+			if err := cli.BuildPayload(&p, payload.JobSearchMetadata{RequestMeta: false}); err != nil {
 				shell.Fatalfln(3, "Failed to build payload: %v", err)
 			}
 
@@ -25,7 +25,7 @@ func RegisterListCommand() {
 				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
 			}
 
-			var jobs []payload.JobStatus
+			var jobs []payload.JobResponse
 			if err := cli.GetPayload(&jobs); err != nil {
 				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
 			}

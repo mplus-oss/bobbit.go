@@ -24,7 +24,7 @@ func (d *DaemonStruct) HandleVibeCheck(jc *JobContext) error {
 }
 
 func (d *DaemonStruct) HandleJob(jc *JobContext) error {
-	var payload payload.JobRequestMetadata
+	var payload payload.JobDetailMetadata
 	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata: %v", err}
 	}
@@ -97,7 +97,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	p := jc.Payload
 
-	var statusRequest payload.JobStatusMetadata
+	var statusRequest payload.JobSearchMetadata
 	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
 		return err
 	}
@@ -114,14 +114,14 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		jobIDs[jobfile] = true
 	}
 
-	allJobs := []payload.JobStatus{}
+	allJobs := []payload.JobResponse{}
 	for id := range jobIDs {
 		metadata, err := ParseJobDataFilename(id)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		status := payload.JobStatus{JobRequestMetadata: metadata}
+		status := payload.JobResponse{JobDetailMetadata: metadata}
 		status.Status = ParseExitCode(d.BobbitConfig, metadata)
 
 		if statusRequest.RequestMeta {
@@ -166,7 +166,7 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	log.Printf("Got job: %v\n", job)
 
 	if job.ID == "" {
-		if err := jc.SendPayload(payload.JobStatus{Status: payload.JOB_NOT_RUNNING}); err != nil {
+		if err := jc.SendPayload(payload.JobResponse{Status: payload.JOB_NOT_RUNNING}); err != nil {
 			return err
 		}
 	}
@@ -193,7 +193,7 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	}
 
 	finalStatus := ParseExitCode(d.BobbitConfig, job)
-	if err := jc.SendPayload(payload.JobStatus{Status: finalStatus}); err != nil {
+	if err := jc.SendPayload(payload.JobResponse{Status: finalStatus}); err != nil {
 		return err
 	}
 
@@ -215,13 +215,13 @@ func (d *DaemonStruct) StatusJob(jc *JobContext) error {
 	}
 
 	if job.ID == "" {
-		if err := jc.SendPayload(payload.JobStatus{Status: payload.JOB_NOT_RUNNING}); err != nil {
+		if err := jc.SendPayload(payload.JobResponse{Status: payload.JOB_NOT_RUNNING}); err != nil {
 			return err
 		}
 	}
 
 	finalStatus := ParseExitCode(d.BobbitConfig, job)
-	if err := jc.SendPayload(payload.JobStatus{Status: finalStatus, JobRequestMetadata: job}); err != nil {
+	if err := jc.SendPayload(payload.JobResponse{Status: finalStatus, JobDetailMetadata: job}); err != nil {
 		return err
 	}
 
