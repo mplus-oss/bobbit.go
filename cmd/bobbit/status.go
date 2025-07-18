@@ -43,7 +43,7 @@ func RegisterStatusCommand() {
 				status = "Unknown"
 			}
 
-			shell.Printf("Status for job Job: %s\n", job.JobName)
+			shell.Printf("Status for Job: %s\n", job.JobName)
 			shell.Printf("------------------------\n")
 			shell.Printf("  ID:        %s\n", job.ID)
 			shell.Printf("  Status:    %s\n", status)
