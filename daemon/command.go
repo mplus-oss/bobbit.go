@@ -43,10 +43,10 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 		payload.Timestamp = jc.Payload.Timestamp
 	}
 
-	lockFile := d.GenerateJobDataFilename(payload, DAEMON_LOCKFILE)
-	logFile := d.GenerateJobDataFilename(payload, DAEMON_LOGFILE)
-	exitCodeFile := d.GenerateJobDataFilename(payload, DAEMON_EXITCODE)
-	metadataFile := d.GenerateJobDataFilename(payload, DAEMON_METADATA)
+	lockFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_LOCKFILE)
+	logFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_LOGFILE)
+	exitCodeFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_EXITCODE)
+	metadataFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_METADATA)
 
 	log.Printf("Entering HandleJob Context: %v", jc)
 	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
@@ -110,22 +110,22 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	log.Printf("Entering ListJob Context: %v", jc)
 	jobIDs := make(map[string]bool)
 	for _, file := range files {
-		jobfile := d.SplitFilenameFromExtfile(file.Name())
+		jobfile := SplitFilenameFromExtfile(file.Name())
 		jobIDs[jobfile] = true
 	}
 
 	allJobs := []payload.JobStatus{}
 	for id := range jobIDs {
-		metadata, err := d.ParseJobDataFilename(id)
+		metadata, err := ParseJobDataFilename(id)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 		status := payload.JobStatus{JobRequestMetadata: metadata}
-		status.Status = d.ParseExitCode(metadata)
+		status.Status = ParseExitCode(d.BobbitConfig, metadata)
 
 		if statusRequest.RequestMeta {
-			if metaBytes, err := os.ReadFile(d.GenerateJobDataFilename(metadata, DAEMON_METADATA)); err == nil {
+			if metaBytes, err := os.ReadFile(GenerateJobDataFilename(d.BobbitConfig, metadata, DAEMON_METADATA)); err == nil {
 				err := json.Unmarshal(metaBytes, &status.Metadata)
 				if err != nil {
 					log.Printf("Failed to unmarshal metadata from %s job: %v", id, err)
@@ -133,7 +133,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 				}
 			}
 		}
-		if _, err := os.Stat(d.GenerateJobDataFilename(metadata, DAEMON_LOCKFILE)); err == nil {
+		if _, err := os.Stat(GenerateJobDataFilename(d.BobbitConfig, metadata, DAEMON_LOCKFILE)); err == nil {
 			status.Status = payload.JOB_RUNNING
 		}
 
@@ -159,7 +159,7 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 		return err
 	}
 
-	job, err := d.FindJobDataFilename(statusRequest)
+	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 		}
 	}
 
-	lockFile := d.GenerateJobDataFilename(job, DAEMON_LOCKFILE)
+	lockFile := GenerateJobDataFilename(d.BobbitConfig, job, DAEMON_LOCKFILE)
 	log.Printf("Waiting job: %v\n", job)
 	for {
 		oneByte := make([]byte, 1)
@@ -192,7 +192,7 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	finalStatus := d.ParseExitCode(job)
+	finalStatus := ParseExitCode(d.BobbitConfig, job)
 	if err := jc.SendPayload(payload.JobStatus{Status: finalStatus}); err != nil {
 		return err
 	}
@@ -209,7 +209,7 @@ func (d *DaemonStruct) StatusJob(jc *JobContext) error {
 		return err
 	}
 
-	job, err := d.FindJobDataFilename(statusRequest)
+	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func (d *DaemonStruct) StatusJob(jc *JobContext) error {
 		}
 	}
 
-	finalStatus := d.ParseExitCode(job)
+	finalStatus := ParseExitCode(d.BobbitConfig, job)
 	if err := jc.SendPayload(payload.JobStatus{Status: finalStatus, JobRequestMetadata: job}); err != nil {
 		return err
 	}

@@ -8,17 +8,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mplus-oss/bobbit.go/config"
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
-func (d *DaemonStruct) GenerateJobDataFilename(p payload.JobRequestMetadata, extFile DaemonFileTypeEnum) string {
+func GenerateJobDataFilename(c config.BobbitConfig, p payload.JobRequestMetadata, extFile DaemonFileTypeEnum) string {
 	return filepath.Join(
-		d.DataDir,
+		c.DataDir,
 		fmt.Sprintf("%s-%s-%s.%s", p.Timestamp.Format(time.RFC3339Nano), p.ID, p.JobName, extFile),
 	)
 }
 
-func (d *DaemonStruct) SplitFilenameFromExtfile(filename string) string {
+func SplitFilenameFromExtfile(filename string) string {
 	var file string
 	if filesplit := strings.Split(filename, "."); len(filesplit) > 2 {
 		file = strings.Join(filesplit[0:2], ".")
@@ -28,8 +29,8 @@ func (d *DaemonStruct) SplitFilenameFromExtfile(filename string) string {
 	return file
 }
 
-func (d *DaemonStruct) ParseJobDataFilename(filename string) (p payload.JobRequestMetadata, err error) {
-	file := d.SplitFilenameFromExtfile(filename)
+func ParseJobDataFilename(filename string) (p payload.JobRequestMetadata, err error) {
+	file := SplitFilenameFromExtfile(filename)
 
 	p.ID = strings.Join(strings.Split(file, "-")[3:4], "-")
 	p.JobName = strings.Join(strings.Split(file, "-")[4:], "-")
@@ -42,8 +43,8 @@ func (d *DaemonStruct) ParseJobDataFilename(filename string) (p payload.JobReque
 	return p, nil
 }
 
-func (d *DaemonStruct) FindJobDataFilename(s payload.JobSearchMetadata) (p payload.JobRequestMetadata, err error) {
-	files, err := os.ReadDir(d.DataDir)
+func FindJobDataFilename(c config.BobbitConfig, s payload.JobSearchMetadata) (p payload.JobRequestMetadata, err error) {
+	files, err := os.ReadDir(c.DataDir)
 	if err != nil {
 		return p, err
 	}
@@ -53,7 +54,7 @@ func (d *DaemonStruct) FindJobDataFilename(s payload.JobSearchMetadata) (p paylo
 			continue
 		}
 
-		jobParser, err := d.ParseJobDataFilename(file.Name())
+		jobParser, err := ParseJobDataFilename(file.Name())
 		if err != nil {
 			return p, err
 		}
@@ -65,8 +66,8 @@ func (d *DaemonStruct) FindJobDataFilename(s payload.JobSearchMetadata) (p paylo
 	return p, nil
 }
 
-func (d *DaemonStruct) ParseExitCode(job payload.JobRequestMetadata) payload.JobStatusEnum {
-	exitCodeBytes, err := os.ReadFile(d.GenerateJobDataFilename(job, DAEMON_EXITCODE))
+func ParseExitCode(c config.BobbitConfig, job payload.JobRequestMetadata) payload.JobStatusEnum {
+	exitCodeBytes, err := os.ReadFile(GenerateJobDataFilename(c, job, DAEMON_EXITCODE))
 	if err != nil {
 		return payload.JOB_NOT_RUNNING
 	}

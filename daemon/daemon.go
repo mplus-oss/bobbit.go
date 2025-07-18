@@ -22,7 +22,7 @@ const (
 
 type DaemonStruct struct {
 	SocketListener net.Listener
-	config.BobbitDaemonConfig
+	config.BobbitConfig
 }
 
 type JobContext struct {
@@ -31,7 +31,7 @@ type JobContext struct {
 	Payload payload.JobPayload
 }
 
-func CreateDaemon(c config.BobbitDaemonConfig) (*DaemonStruct, error) {
+func CreateDaemon(c config.BobbitConfig) (*DaemonStruct, error) {
 	if err := os.MkdirAll(c.DataDir, 0755); err != nil {
 		return nil, &DaemonError{"Failed to create data directory: %v", err}
 	}
@@ -46,8 +46,8 @@ func CreateDaemon(c config.BobbitDaemonConfig) (*DaemonStruct, error) {
 	}
 
 	return &DaemonStruct{
-		SocketListener:     listener,
-		BobbitDaemonConfig: c,
+		SocketListener: listener,
+		BobbitConfig:   c,
 	}, nil
 }
 
