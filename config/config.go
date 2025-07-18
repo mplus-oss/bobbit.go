@@ -6,18 +6,20 @@ import (
 	"github.com/mplus-oss/bobbit.go/internal/lib"
 )
 
-type BobbitClientConfig struct {
+type BobbitConfig struct {
 	SocketPath string
+	DataDir    string
 	DebugMode  bool
 }
 
-func NewClient() BobbitClientConfig {
+func New() BobbitConfig {
 	debug := false
 	if env := os.Getenv("DEBUG"); env != "" {
 		debug = true
 	}
 
-	return BobbitClientConfig{
+	return BobbitConfig{
+		DataDir:    lib.GetDefaultEnv("BOBBIT_DATA_DIR", "/tmp/bobbitd"),
 		SocketPath: lib.GetDefaultEnv("BOBBIT_SOCKET_PATH", "/tmp/bobbitd.sock"),
 		DebugMode:  debug,
 	}

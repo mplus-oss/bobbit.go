@@ -10,17 +10,17 @@ import (
 
 type DaemonConnectionStruct struct {
 	Connection net.Conn
-	config.BobbitClientConfig
+	config.BobbitConfig
 }
 
-func New(c config.BobbitClientConfig) *DaemonConnectionStruct {
+func New(c config.BobbitConfig) *DaemonConnectionStruct {
 	return &DaemonConnectionStruct{
-		BobbitClientConfig: c,
+		BobbitConfig: c,
 	}
 }
 
 func (d *DaemonConnectionStruct) BuildPayload(p *payload.JobPayload, metadata any) error {
-	conn, err := net.Dial("unix", d.BobbitClientConfig.SocketPath)
+	conn, err := net.Dial("unix", d.BobbitConfig.SocketPath)
 	if err != nil {
 		conn.Close()
 		return err

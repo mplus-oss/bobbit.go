@@ -8,7 +8,7 @@ import (
 
 type DaemonNotRunningError struct {
 	NetError error
-	Config   config.BobbitClientConfig
+	Config   config.BobbitConfig
 }
 
 func (d *DaemonNotRunningError) Error() string {

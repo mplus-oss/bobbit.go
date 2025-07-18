@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	c   = config.NewClient()
+	c   = config.New()
 	cli = client.New(c)
 	cmd = &cobra.Command{
 		Use:   "bobbit",
