@@ -1,5 +1,6 @@
 package payload
 
 type JobSearchMetadata struct {
-	Search string `json:"search"`
+	RequestMeta bool   `json:"request_meta"`
+	Search      string `json:"search"`
 }

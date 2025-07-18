@@ -2,7 +2,7 @@ package payload
 
 import "time"
 
-type JobRequestMetadata struct {
+type JobDetailMetadata struct {
 	ID        string                 `json:"id"`
 	JobName   string                 `json:"job_name"`
 	Timestamp time.Time              `json:"timestamp"`
