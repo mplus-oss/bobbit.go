@@ -20,16 +20,17 @@ func GenerateJobDataFilename(c config.BobbitConfig, p payload.JobDetailMetadata,
 }
 
 func SplitFilenameFromExtfile(filename string) string {
-	var file string
-	if filesplit := strings.Split(filename, "."); len(filesplit) > 1 {
-		file = strings.Join(filesplit[:len(filesplit)-1], ".")
-	} else {
-		file = filename
-	}
-	return file
+	ext := filepath.Ext(filename)
+	return strings.TrimSuffix(filename, ext)
 }
 
 func ParseJobDataFilename(filename string) (p payload.JobDetailMetadata, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("Failed to parsing filename, format not supported: filename=%v err=%v", filename, r)
+		}
+	}()
+
 	file := SplitFilenameFromExtfile(filename)
 	fileSplit := strings.Split(file, "-")
 

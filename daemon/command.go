@@ -18,7 +18,7 @@ import (
 func (d *DaemonStruct) HandleVibeCheck(jc *JobContext) error {
 	var payload payload.PayloadRegularMetadata
 	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {
-		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata.", err}
+		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 	return nil
 }
@@ -26,16 +26,16 @@ func (d *DaemonStruct) HandleVibeCheck(jc *JobContext) error {
 func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	var payload payload.JobDetailMetadata
 	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {
-		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata: %v", err}
+		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
 	if payload.JobName == "" || len(payload.Command) < 1 {
-		return &DaemonError{"Invalid payload: JobName or Command not provided.", nil}
+		return &DaemonError{"Invalid payload: JobName or Command not provided", nil}
 	}
 	if payload.ID == "" {
 		hash, err := lib.GenerateRandomHash(16)
 		if err != nil {
-			return &DaemonError{"Failed to create Hash for job: %v", err}
+			return &DaemonError{"Failed to create Hash for job", err}
 		}
 		payload.ID = hash
 	}
@@ -50,29 +50,29 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 
 	log.Printf("Entering HandleJob Context: %v", jc)
 	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
-		return &DaemonPayloadError{"Failed to create lockfile.", payload.ID, err}
+		return &DaemonPayloadError{"Failed to create lockfile", payload.ID, err}
 	}
 	defer os.Remove(lockFile)
 
 	if payload.Metadata != nil {
 		metaByte, err := json.Marshal(payload.Metadata)
 		if err != nil {
-			return &DaemonPayloadError{"Failed to marshal metadata.", payload.ID, err}
+			return &DaemonPayloadError{"Failed to marshal metadata", payload.ID, err}
 		}
 		if err := os.WriteFile(metadataFile, metaByte, 0644); err != nil {
-			return &DaemonPayloadError{"Failed to create metadata file.", payload.ID, err}
+			return &DaemonPayloadError{"Failed to create metadata file", payload.ID, err}
 		}
 	}
 
 	logOutput, err := os.Create(logFile)
 	if err != nil {
-		return &DaemonPayloadError{"Failed to create logfile.", payload.ID, err}
+		return &DaemonPayloadError{"Failed to create logfile", payload.ID, err}
 	}
 	defer logOutput.Close()
 
 	exitCode := 0
 	if len(payload.Command) == 0 {
-		return &DaemonPayloadError{"No command provided.", payload.ID, err}
+		return &DaemonPayloadError{"No command provided", payload.ID, err}
 	}
 
 	cmd := exec.Command(payload.Command[0], payload.Command[1:]...)
@@ -99,12 +99,12 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 
 	var statusRequest payload.JobSearchMetadata
 	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
-		return err
+		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
 	files, err := os.ReadDir(d.DataDir)
 	if err != nil {
-		return err
+		return &DaemonError{"Failed to read bobbit directory", err}
 	}
 
 	log.Printf("Entering ListJob Context: %v", jc)
@@ -124,6 +124,10 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		status := payload.JobResponse{JobDetailMetadata: metadata}
 		if err := ParseExitCode(d.BobbitConfig, &status); err != nil {
 			log.Printf("Failed to parse exit code from %s job: %v\n", id, err)
+			continue
+		}
+
+		if statusRequest.ActiveOnly && status.Status != payload.JOB_RUNNING {
 			continue
 		}
 
@@ -147,7 +151,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	})
 
 	if err := jc.SendPayload(allJobs); err != nil {
-		return err
+		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 
 	log.Println("DONE: LIST")
@@ -159,17 +163,17 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 
 	var statusRequest payload.JobSearchMetadata
 	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
-		return err
+		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
 	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
 	if err != nil {
-		return err
+		return &DaemonError{"Failed to find job data", err}
 	}
 
 	if job.ID == "" {
 		if err := jc.SendPayload(payload.JobResponse{Status: payload.JOB_NOT_RUNNING}); err != nil {
-			return err
+			return &DaemonError{"Invalid metadata: Failed to send payload", err}
 		}
 	}
 
@@ -194,12 +198,12 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	resp := payload.JobResponse{}
+	resp := payload.JobResponse{JobDetailMetadata: job}
 	if err := ParseExitCode(d.BobbitConfig, &resp); err != nil {
-		return err
+		return &DaemonPayloadError{"Failed to parse exit code", job.JobName, err}
 	}
 	if err := jc.SendPayload(resp); err != nil {
-		return err
+		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 
 	log.Printf("Job waiting finish: %v\n", job)
@@ -211,26 +215,26 @@ func (d *DaemonStruct) StatusJob(jc *JobContext) error {
 
 	var statusRequest payload.JobSearchMetadata
 	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
-		return err
+		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
 	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
 	if err != nil {
-		return err
+		return &DaemonError{"Failed to find job data", err}
 	}
 
 	if job.ID == "" {
 		if err := jc.SendPayload(payload.JobResponse{Status: payload.JOB_NOT_RUNNING}); err != nil {
-			return err
+			return &DaemonError{"Invalid metadata: Failed to send payload", err}
 		}
 	}
 
 	finalStatus := payload.JobResponse{JobDetailMetadata: job}
 	if err := ParseExitCode(d.BobbitConfig, &finalStatus); err != nil {
-		return err
+		return &DaemonPayloadError{"Failed to parse exit code", job.JobName, err}
 	}
 	if err := jc.SendPayload(finalStatus); err != nil {
-		return err
+		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 
 	return nil
