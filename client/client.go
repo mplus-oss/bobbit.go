@@ -19,10 +19,9 @@ func New(c config.BobbitConfig) *DaemonConnectionStruct {
 	}
 }
 
-func (d *DaemonConnectionStruct) BuildPayload(p *payload.JobPayload, metadata any) error {
+func (d *DaemonConnectionStruct) BuildPayload(p *payload.JobPayload, metadata any) (err error) {
 	conn, err := net.Dial("unix", d.BobbitConfig.SocketPath)
 	if err != nil {
-		conn.Close()
 		return err
 	}
 	d.Connection = conn
