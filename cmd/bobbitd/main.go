@@ -22,35 +22,46 @@ var (
 )
 
 func init() {
+	cmd.Flags().Bool("fix-logfile", false, "Fix logfile for old version")
 	cmd.Run = func(cmd *cobra.Command, args []string) {
 		log.Printf("Directory data: %s", c.DataDir)
 		log.Printf("Socket Path: %s", c.SocketPath)
 
-		d, err := daemon.CreateDaemon(c)
+		fixLogfile, err := cmd.Flags().GetBool("fix-logfile")
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
-		go d.CleanupDaemon(sigChan)
-		log.Println("Daemon started, waiting for response.")
-
-		for {
-			conn, err := d.SocketListener.Accept()
-			if err != nil {
-				log.Printf("Failed to receive connection: %v", err)
-				continue
+		if (fixLogfile) {
+			if err := handleFixLogFile(); err != nil {
+				log.Fatalln(err)
 			}
-			defer conn.Close()
-
-			go handleConnection(d, conn)
+			return
 		}
+
+		startDaemon()
 	}
 }
 
-func main() {
-	if err := cmd.Execute(); err != nil {
-		os.Exit(100)
+func startDaemon() {
+	d, err := daemon.CreateDaemon(c)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	go d.CleanupDaemon(sigChan)
+	log.Println("Daemon started, waiting for response.")
+
+	for {
+		conn, err := d.SocketListener.Accept()
+		if err != nil {
+			log.Printf("Failed to receive connection: %v", err)
+			continue
+		}
+		defer conn.Close()
+
+		go handleConnection(d, conn)
 	}
 }
 
@@ -65,4 +76,10 @@ func handleConnection(d *daemon.DaemonStruct, conn net.Conn) {
 	log.Printf("Job received: %+v", jobCtx.Payload)
 
 	RouteHandler(d, jobCtx)
+}
+
+func main() {
+	if err := cmd.Execute(); err != nil {
+		os.Exit(100)
+	}
 }
