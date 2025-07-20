@@ -9,35 +9,48 @@ import (
 
 	"github.com/mplus-oss/bobbit.go/config"
 	"github.com/mplus-oss/bobbit.go/daemon"
+	"github.com/spf13/cobra"
 )
 
 var (
 	c       = config.New()
 	sigChan = make(chan os.Signal, 1)
+	cmd     = &cobra.Command{
+		Use:   "bobbitd",
+		Short: "Daemon worker for bobbit.",
+	}
 )
 
-func main() {
-	log.Printf("Directory data: %s", c.DataDir)
-	log.Printf("Socket Path: %s", c.SocketPath)
+func init() {
+	cmd.Run = func(cmd *cobra.Command, args []string) {
+		log.Printf("Directory data: %s", c.DataDir)
+		log.Printf("Socket Path: %s", c.SocketPath)
 
-	d, err := daemon.CreateDaemon(c)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
-	go d.CleanupDaemon(sigChan)
-	log.Println("Daemon started, waiting for response.")
-
-	for {
-		conn, err := d.SocketListener.Accept()
+		d, err := daemon.CreateDaemon(c)
 		if err != nil {
-			log.Printf("Failed to receive connection: %v", err)
-			continue
+			log.Fatalln(err)
 		}
-		defer conn.Close()
 
-		go handleConnection(d, conn)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+		go d.CleanupDaemon(sigChan)
+		log.Println("Daemon started, waiting for response.")
+
+		for {
+			conn, err := d.SocketListener.Accept()
+			if err != nil {
+				log.Printf("Failed to receive connection: %v", err)
+				continue
+			}
+			defer conn.Close()
+
+			go handleConnection(d, conn)
+		}
+	}
+}
+
+func main() {
+	if err := cmd.Execute(); err != nil {
+		os.Exit(100)
 	}
 }
 
