@@ -9,17 +9,41 @@ import (
 
 	"github.com/mplus-oss/bobbit.go/config"
 	"github.com/mplus-oss/bobbit.go/daemon"
+	"github.com/spf13/cobra"
 )
 
 var (
 	c       = config.New()
 	sigChan = make(chan os.Signal, 1)
+	cmd     = &cobra.Command{
+		Use:   "bobbitd",
+		Short: "Daemon worker for bobbit.",
+	}
 )
 
-func main() {
-	log.Printf("Directory data: %s", c.DataDir)
-	log.Printf("Socket Path: %s", c.SocketPath)
+func init() {
+	cmd.Flags().Bool("fix-logfile", false, "Fix logfile for old version")
+	cmd.Run = func(cmd *cobra.Command, args []string) {
+		log.Printf("Directory data: %s", c.DataDir)
+		log.Printf("Socket Path: %s", c.SocketPath)
 
+		fixLogfile, err := cmd.Flags().GetBool("fix-logfile")
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		if (fixLogfile) {
+			if err := handleFixLogFile(); err != nil {
+				log.Fatalln(err)
+			}
+			return
+		}
+
+		startDaemon()
+	}
+}
+
+func startDaemon() {
 	d, err := daemon.CreateDaemon(c)
 	if err != nil {
 		log.Fatalln(err)
@@ -52,4 +76,10 @@ func handleConnection(d *daemon.DaemonStruct, conn net.Conn) {
 	log.Printf("Job received: %+v", jobCtx.Payload)
 
 	RouteHandler(d, jobCtx)
+}
+
+func main() {
+	if err := cmd.Execute(); err != nil {
+		os.Exit(100)
+	}
 }
