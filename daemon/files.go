@@ -72,8 +72,14 @@ func FindJobDataFilename(c config.BobbitConfig, s payload.JobSearchMetadata) (p 
 func ParseExitCode(c config.BobbitConfig, job *payload.JobResponse) error {
 	exitCodeBytes, err := os.ReadFile(GenerateJobDataFilename(c, job.JobDetailMetadata, DAEMON_EXITCODE))
 	if err != nil {
+		lockfile := GenerateJobDataFilename(c, job.JobDetailMetadata, DAEMON_LOCKFILE)
 		job.ExitCode = -1
-		job.Status = payload.JOB_NOT_RUNNING
+
+		if _, err := os.Stat(lockfile); err == nil {
+			job.Status = payload.JOB_RUNNING
+		} else {
+			job.Status = payload.JOB_NOT_RUNNING
+		}
 		return nil
 	}
 

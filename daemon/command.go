@@ -148,10 +148,6 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 			continue
 		}
 
-		if statusRequest.ActiveOnly && status.Status != payload.JOB_RUNNING {
-			continue
-		}
-
 		if statusRequest.RequestMeta {
 			if metaBytes, err := os.ReadFile(GenerateJobDataFilename(d.BobbitConfig, metadata, DAEMON_METADATA)); err == nil {
 				err := json.Unmarshal(metaBytes, &status.Metadata)
@@ -161,8 +157,9 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 				}
 			}
 		}
-		if _, err := os.Stat(GenerateJobDataFilename(d.BobbitConfig, metadata, DAEMON_LOCKFILE)); err == nil {
-			status.Status = payload.JOB_RUNNING
+
+		if statusRequest.ActiveOnly && status.Status != payload.JOB_RUNNING {
+			continue
 		}
 
 		allJobs = append(allJobs, status)
