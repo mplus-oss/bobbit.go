@@ -79,7 +79,10 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	cmd := exec.Command(payload.Command[0], payload.Command[1:]...)
 	cmd.Stdout = logOutput
 	cmd.Stderr = logOutput
+
 	cmd.Env = append(os.Environ(), fmt.Sprintf("JOB_ID=%s", payload.ID))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("JOB_NAME=%s", payload.JobName))
+
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
