@@ -55,14 +55,18 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	}
 	defer os.Remove(lockFile)
 
+	metadataStr := ""
 	if payload.Metadata != nil {
 		metaByte, err := json.Marshal(payload.Metadata)
 		if err != nil {
 			return &DaemonPayloadError{"Failed to marshal metadata", payload.ID, err}
 		}
+
 		if err := os.WriteFile(metadataFile, metaByte, 0644); err != nil {
 			return &DaemonPayloadError{"Failed to create metadata file", payload.ID, err}
 		}
+
+		metadataStr = string(metaByte)
 	}
 
 	logOutput, err := os.Create(logFile)
@@ -80,8 +84,12 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	cmd.Stdout = logOutput
 	cmd.Stderr = logOutput
 
-	cmd.Env = append(os.Environ(), fmt.Sprintf("JOB_ID=%s", payload.ID))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("JOB_NAME=%s", payload.JobName))
+	cmd.Env = append(
+		os.Environ(),
+		fmt.Sprintf("JOB_ID=%s", payload.ID),
+		fmt.Sprintf("JOB_NAME=%s", payload.JobName),
+		fmt.Sprintf("JOB_METADATA=%s", metadataStr),
+	)
 
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
