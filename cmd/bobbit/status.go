@@ -44,6 +44,8 @@ func RegisterStatusCommand() {
 				status = "Finished"
 			case payload.JOB_NOT_RUNNING:
 				status = "Not running"
+			case payload.JOB_RUNNING:
+				status = "Running"
 			default:
 				status = "Unknown"
 			}
