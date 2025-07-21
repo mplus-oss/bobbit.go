@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -110,6 +111,15 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	log.Printf("Entering ListJob Context: %v", jc)
 	jobIDs := make(map[string]bool)
 	for _, file := range files {
+		if filestat, err := os.Stat(filepath.Join(d.DataDir, file.Name())); err != nil{
+			log.Printf("Error when checking status of file: %v", err)
+			continue
+		} else {
+			if filestat.IsDir() {
+				continue
+			}
+		}
+
 		jobfile := SplitFilenameFromExtfile(file.Name())
 		jobIDs[jobfile] = true
 	}
