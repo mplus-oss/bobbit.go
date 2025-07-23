@@ -15,7 +15,7 @@ const (
 	REQUEST_VIBE_CHECK
 )
 
-type PayloadRegularMetadata map[string]any
+type PayloadRegularMetadata any
 type JobPayload struct {
 	Request   PayloadRequestEnum     `json:"request"`
 	Timestamp time.Time              `json:"timestamp"`
