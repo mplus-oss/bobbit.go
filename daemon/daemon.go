@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/fs"
 	"log"
 	"net"
 	"os"
@@ -32,17 +34,23 @@ type JobContext struct {
 }
 
 func CreateDaemon(c config.BobbitConfig) (*DaemonStruct, error) {
+	if socket, err := os.Stat(c.SocketPath); err == nil {
+		if socket.Mode().Type() == fs.ModeSocket {
+			return nil, &DaemonError{"Daemon is already started", fmt.Errorf("Daemon found in %v", c.SocketPath)}
+		}
+	}
+
 	if err := os.MkdirAll(c.DataDir, 0755); err != nil {
-		return nil, &DaemonError{"Failed to create data directory: %v", err}
+		return nil, &DaemonError{"Failed to create data directory", err}
 	}
 
 	if err := os.RemoveAll(c.SocketPath); err != nil {
-		return nil, &DaemonError{"Failed to remove old socket path: %v", err}
+		return nil, &DaemonError{"Failed to remove old socket path", err}
 	}
 
 	listener, err := net.Listen("unix", c.SocketPath)
 	if err != nil {
-		return nil, &DaemonError{"Failed to listen in socket path: %v", err}
+		return nil, &DaemonError{"Failed to listen in socket path", err}
 	}
 
 	return &DaemonStruct{
