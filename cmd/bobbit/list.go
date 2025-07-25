@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -20,11 +21,30 @@ func RegisterListCommand() {
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
 			}
+			orderDesc, err := cmd.Flags().GetBool("order-desc")
+			if err != nil {
+				shell.Fatalfln(3, "%v", err)
+			}
+			limitJob, err := cmd.Flags().GetInt("limit")
+			if err != nil {
+				shell.Fatalfln(3, "%v", err)
+			}
+			countJob, err := cmd.Flags().GetBool("count")
+			if err != nil {
+				shell.Fatalfln(3, "%v", err)
+			}
+			toJson, err := cmd.Flags().GetBool("to-json")
+			if err != nil {
+				shell.Fatalfln(3, "%v", err)
+			}
 
 			p := payload.JobPayload{Request: payload.REQUEST_LIST}
 			req := payload.JobSearchMetadata{
 				RequestMeta: false,
 				ActiveOnly:  activeOnly,
+				Limit:       limitJob,
+				NumberOnly:  countJob,
+				OrderDesc:   orderDesc,
 			}
 			if err := cli.BuildPayload(&p, req); err != nil {
 				shell.Fatalfln(3, "Failed to build payload: %v", err)
@@ -34,9 +54,28 @@ func RegisterListCommand() {
 				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
 			}
 
+			if countJob {
+				var resp payload.JobResponseCount
+				if err := cli.GetPayload(&resp); err != nil {
+					shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
+				}
+				shell.Printfln("%v", resp.Count)
+				return
+			}
+
 			var jobs []payload.JobResponse
 			if err := cli.GetPayload(&jobs); err != nil {
 				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
+			}
+
+			if toJson {
+				byteStr, err := json.Marshal(jobs)
+				if err != nil {
+					shell.Fatalln(3, err.Error())
+					return
+				}
+				shell.Println(string(byteStr))
+				return
 			}
 
 			w := tabwriter.NewWriter(os.Stderr, 0, 0, 3, ' ', 0)
@@ -66,6 +105,12 @@ func RegisterListCommand() {
 			}
 		},
 	}
-	list.Flags().Bool("active-only", false, "List only for job with running/active status")
+
+	list.Flags().Bool("active-only", false, "Filters the list to show only jobs with a running or active status")
+	list.Flags().Bool("order-desc", false, "Orders the list of jobs in descending order")
+	list.Flags().Int("limit", 0, "Sets a maximum number of jobs to return")
+	list.Flags().Bool("count", false, "Returns only the total count of jobs instead of the full list")
+	list.Flags().BoolP("to-json", "j", false, "Print the list to stringify JSON")
+
 	cmd.AddCommand(list)
 }

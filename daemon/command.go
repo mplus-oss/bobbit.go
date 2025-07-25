@@ -122,7 +122,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	log.Printf("Entering ListJob Context: %v", jc)
 	jobIDs := make(map[string]bool)
 	for _, file := range files {
-		if filestat, err := os.Stat(filepath.Join(d.DataDir, file.Name())); err != nil{
+		if filestat, err := os.Stat(filepath.Join(d.DataDir, file.Name())); err != nil {
 			log.Printf("Error when checking status of file: %v", err)
 			continue
 		} else {
@@ -163,13 +163,26 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		}
 
 		allJobs = append(allJobs, status)
+		if statusRequest.Limit > 0 && len(allJobs) >= statusRequest.Limit {
+			break
+		}
 	}
 	sort.Slice(allJobs, func(i, j int) bool {
-		return allJobs[i].Timestamp.Before(allJobs[j].Timestamp)
+		if statusRequest.OrderDesc {
+			return allJobs[i].Timestamp.Before(allJobs[j].Timestamp)
+		} else {
+			return allJobs[j].Timestamp.Before(allJobs[i].Timestamp)
+		}
 	})
 
-	if err := jc.SendPayload(allJobs); err != nil {
-		return &DaemonError{"Invalid metadata: Failed to send payload", err}
+	if statusRequest.NumberOnly {
+		if err := jc.SendPayload(payload.JobResponseCount{Count: len(allJobs)}); err != nil {
+			return &DaemonError{"Invalid metadata: Failed to send payload", err}
+		}
+	} else {
+		if err := jc.SendPayload(allJobs); err != nil {
+			return &DaemonError{"Invalid metadata: Failed to send payload", err}
+		}
 	}
 
 	log.Println("DONE: LIST")
