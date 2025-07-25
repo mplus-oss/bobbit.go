@@ -22,5 +22,5 @@ type JobSearchMetadata struct {
 	NumberOnly bool `json:"number_only,omitempty"`
 
 	// When true, orders the results in descending order.
-	OrderDesc bool `json:"desc.omitempty"`
+	OrderDesc bool `json:"desc,omitempty"`
 }
