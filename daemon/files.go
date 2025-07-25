@@ -12,6 +12,7 @@ import (
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
+// GenerateJobDataFilename generates a filename for job-related data based on the provided configuration, job metadata, and file type.
 func GenerateJobDataFilename(c config.BobbitConfig, p payload.JobDetailMetadata, extFile DaemonFileTypeEnum) string {
 	return filepath.Join(
 		c.DataDir,
@@ -19,11 +20,15 @@ func GenerateJobDataFilename(c config.BobbitConfig, p payload.JobDetailMetadata,
 	)
 }
 
+// SplitFilenameFromExtfile splits the filename from its extension.
+// It returns the filename without the extension.
 func SplitFilenameFromExtfile(filename string) string {
 	ext := filepath.Ext(filename)
 	return strings.TrimSuffix(filename, ext)
 }
 
+// ParseJobDataFilename parses the job detail metadata from a given filename.
+// It returns a JobDetailMetadata struct and an error if parsing fails.
 func ParseJobDataFilename(filename string) (p payload.JobDetailMetadata, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -46,6 +51,8 @@ func ParseJobDataFilename(filename string) (p payload.JobDetailMetadata, err err
 	return p, nil
 }
 
+// FindJobDataFilename searches for a job data filename based on the provided configuration and search metadata.
+// It returns the found JobDetailMetadata and an error if an issue occurs during directory reading or parsing.
 func FindJobDataFilename(c config.BobbitConfig, s payload.JobSearchMetadata) (p payload.JobDetailMetadata, err error) {
 	files, err := os.ReadDir(c.DataDir)
 	if err != nil {
@@ -69,6 +76,8 @@ func FindJobDataFilename(c config.BobbitConfig, s payload.JobSearchMetadata) (p 
 	return p, nil
 }
 
+// ParseExitCode reads the exit code for a job from a file and updates the job's status accordingly.
+// It returns an error if reading or parsing the exit code fails.
 func ParseExitCode(c config.BobbitConfig, job *payload.JobResponse) error {
 	exitCodeBytes, err := os.ReadFile(GenerateJobDataFilename(c, job.JobDetailMetadata, DAEMON_EXITCODE))
 	if err != nil {

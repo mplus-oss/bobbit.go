@@ -16,6 +16,8 @@ import (
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
+// HandleVibeCheck handles a "vibe check" request, which typically serves as a basic
+// ping to confirm the daemon is responsive. It unmarshals the request metadata.
 func (d *DaemonStruct) HandleVibeCheck(jc *JobContext) error {
 	var payload payload.PayloadRegularMetadata
 	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {
@@ -24,6 +26,9 @@ func (d *DaemonStruct) HandleVibeCheck(jc *JobContext) error {
 	return nil
 }
 
+// HandleJob processes a new job request. It validates the job payload,
+// generates a unique ID if not provided, creates necessary data files (lock, log, metadata),
+// executes the command, captures its output and exit code, and cleans up the lock file.
 func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	var payload payload.JobDetailMetadata
 	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {
@@ -106,6 +111,9 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	return nil
 }
 
+// ListJob handles requests to list jobs. It reads job data from the configured
+// directory, filters them based on `JobSearchMetadata` criteria (e.g., active only, limit),
+// parses their status and optional metadata, sorts them, and sends the results back to the client.
 func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	p := jc.Payload
 
@@ -189,6 +197,10 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	return nil
 }
 
+// WaitJob handles requests to wait for a specific job to complete.
+// It continuously checks for the absence of the job's lock file and
+// responds to the client with the job's final status once completed.
+// It also handles client connection timeouts.
 func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	p := jc.Payload
 
@@ -241,6 +253,9 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	return nil
 }
 
+// StatusJob handles requests to retrieve the current status of a specific job.
+// It finds the job based on the provided search metadata, parses its exit code
+// to determine its status, and sends the `JobResponse` back to the client.
 func (d *DaemonStruct) StatusJob(jc *JobContext) error {
 	p := jc.Payload
 
