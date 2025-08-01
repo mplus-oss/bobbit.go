@@ -198,7 +198,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 
 	if statusRequest.NumberOnly {
 		jobs := len(allJobs)
-		allJobs = nil 
+		allJobs = nil
 		if err := jc.SendPayload(payload.JobResponseCount{Count: jobs}); err != nil {
 			return &DaemonError{"Invalid metadata: Failed to send payload", err}
 		}
