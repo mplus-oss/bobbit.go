@@ -38,6 +38,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	if payload.JobName == "" || len(payload.Command) < 1 {
 		return &DaemonError{"Invalid payload: JobName or Command not provided", nil}
 	}
+	// Generate a unique ID if not provided
 	if payload.ID == "" {
 		hash, err := lib.GenerateRandomHash(16)
 		if err != nil {
@@ -45,10 +46,12 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 		}
 		payload.ID = hash
 	}
+	// Set timestamp if not provided
 	if payload.Timestamp.IsZero() {
 		payload.Timestamp = jc.Payload.Timestamp
 	}
 
+	// Generate file paths for job-related data
 	lockFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_LOCKFILE)
 	logFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_LOGFILE)
 	exitCodeFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_EXITCODE)
@@ -61,6 +64,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	defer os.Remove(lockFile)
 
 	metadataStr := ""
+	// Marshal and write job metadata to a file
 	if payload.Metadata != nil {
 		metaByte, err := json.Marshal(payload.Metadata)
 		if err != nil {
@@ -89,6 +93,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	cmd.Stdout = logOutput
 	cmd.Stderr = logOutput
 
+	// Add job-specific environment variables
 	cmd.Env = append(
 		os.Environ(),
 		fmt.Sprintf("JOB_ID=%s", payload.ID),
@@ -131,6 +136,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 
 	log.Printf("Entering ListJob Context: %v", jc)
 	jobIDs := make(map[string]bool)
+	// Collect unique job IDs from the filenames
 	for _, file := range files {
 		if filestat, err := os.Stat(filepath.Join(d.DataDir, file.Name())); err != nil {
 			log.Printf("Error when checking status of file: %v", err)
@@ -145,16 +151,19 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		jobIDs[jobfile] = true
 	}
 
+	// Convert map keys to slice and sort
 	jobIDSlice := make([]string, 0, len(jobIDs))
 	for k := range jobIDs {
 		jobIDSlice = append(jobIDSlice, k)
 		delete(jobIDs, k)
 	}
 	slices.Sort(jobIDSlice)
+	// Reverse order if requested
 	if statusRequest.OrderDesc {
 		slices.Reverse(jobIDSlice)
 	}
 
+	// Apply pagination (limit and page) if specified
 	if statusRequest.Limit > 0 {
 		start := 0
 		end := statusRequest.Limit
@@ -173,7 +182,9 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	}
 
 	allJobs := []payload.JobResponse{}
+	// Iterate through selected job IDs to gather full job details
 	for _, id := range jobIDSlice {
+		// Skip if both finish-only and active-only filters are set (mutually exclusive)
 		if statusRequest.FinishOnly && statusRequest.ActiveOnly {
 			continue
 		}
@@ -208,11 +219,9 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		}
 
 		allJobs = append(allJobs, status)
-		if statusRequest.Limit > 0 && len(allJobs) >= statusRequest.Limit {
-			break
-		}
 	}
 
+	// Send back job count or full job details based on request
 	if statusRequest.NumberOnly {
 		jobs := len(allJobs)
 		allJobs = nil
@@ -246,6 +255,7 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 		return &DaemonError{"Failed to find job data", err}
 	}
 
+	// If job ID is empty, the job was not found, send a "not running" status
 	if job.ID == "" {
 		if err := jc.SendPayload(payload.JobResponse{Status: payload.JOB_NOT_RUNNING}); err != nil {
 			return &DaemonError{"Invalid metadata: Failed to send payload", err}
@@ -255,21 +265,26 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	lockFile := GenerateJobDataFilename(d.BobbitConfig, job, DAEMON_LOCKFILE)
 	log.Printf("Entering WaitJob Context: %v\n", job)
 	for {
+		// Set a short read deadline to check for client disconnection without blocking indefinitely
 		oneByte := make([]byte, 1)
 		jc.conn.SetReadDeadline(time.Now().Add(1 * time.Millisecond))
 		if _, err := jc.conn.Read(oneByte); err != io.EOF {
+			// If error is not EOF and not a timeout, it means connection issue, return error
 			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
 				log.Printf("Connection closed from client. job=%v\n", job)
 				return err
 			}
 		} else {
+			// If EOF is returned, the client has closed the connection
 			return &DaemonError{"Connection Error", err}
 		}
 		jc.conn.SetReadDeadline(time.Time{})
 
+		// Check if the lock file exists; if not, the job has completed
 		if _, err := os.Stat(lockFile); os.IsNotExist(err) {
 			break
 		}
+		// Wait before polling again to avoid busy-waiting
 		time.Sleep(500 * time.Millisecond)
 	}
 
