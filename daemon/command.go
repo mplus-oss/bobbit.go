@@ -187,9 +187,9 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	}
 	sort.Slice(allJobs, func(i, j int) bool {
 		if statusRequest.OrderDesc {
-			return allJobs[i].Timestamp.Before(allJobs[j].Timestamp)
-		} else {
 			return allJobs[j].Timestamp.Before(allJobs[i].Timestamp)
+		} else {
+			return allJobs[i].Timestamp.Before(allJobs[j].Timestamp)
 		}
 	})
 
