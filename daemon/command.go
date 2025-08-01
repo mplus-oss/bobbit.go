@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/mplus-oss/bobbit.go/internal/lib"
@@ -145,8 +145,35 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		jobIDs[jobfile] = true
 	}
 
+	jobIDSlice := make([]string, 0, len(jobIDs))
+	for k := range jobIDs {
+		jobIDSlice = append(jobIDSlice, k)
+		delete(jobIDs, k)
+	}
+	slices.Sort(jobIDSlice)
+	if statusRequest.OrderDesc {
+		slices.Reverse(jobIDSlice)
+	}
+
+	if statusRequest.Limit > 0 {
+		start := 0
+		end := statusRequest.Limit
+
+		if statusRequest.Page > 0 {
+			start = (statusRequest.Page - 1) * statusRequest.Limit
+			end = start + statusRequest.Limit
+		}
+
+		if start >= len(jobIDSlice) {
+			jobIDSlice = []string{}
+		} else {
+			end = min(end, len(jobIDSlice))
+			jobIDSlice = jobIDSlice[start:end]
+		}
+	}
+
 	allJobs := []payload.JobResponse{}
-	for id := range jobIDs {
+	for _, id := range jobIDSlice {
 		if statusRequest.FinishOnly && statusRequest.ActiveOnly {
 			continue
 		}
@@ -185,16 +212,11 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 			break
 		}
 	}
-	sort.Slice(allJobs, func(i, j int) bool {
-		if statusRequest.OrderDesc {
-			return allJobs[j].Timestamp.Before(allJobs[i].Timestamp)
-		} else {
-			return allJobs[i].Timestamp.Before(allJobs[j].Timestamp)
-		}
-	})
 
 	if statusRequest.NumberOnly {
-		if err := jc.SendPayload(payload.JobResponseCount{Count: len(allJobs)}); err != nil {
+		jobs := len(allJobs)
+		allJobs = nil
+		if err := jc.SendPayload(payload.JobResponseCount{Count: jobs}); err != nil {
 			return &DaemonError{"Invalid metadata: Failed to send payload", err}
 		}
 	} else {

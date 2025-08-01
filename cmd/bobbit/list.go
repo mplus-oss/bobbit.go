@@ -33,6 +33,10 @@ func RegisterListCommand() {
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
 			}
+			pageJob, err := cmd.Flags().GetInt("page")
+			if err != nil {
+				shell.Fatalfln(3, "%v", err)
+			}
 			countJob, err := cmd.Flags().GetBool("count")
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
@@ -47,6 +51,7 @@ func RegisterListCommand() {
 				RequestMeta: false,
 				ActiveOnly:  activeOnly,
 				Limit:       limitJob,
+				Page:        pageJob,
 				NumberOnly:  countJob,
 				OrderDesc:   orderDesc,
 				FinishOnly:  finishOnly,
@@ -115,6 +120,7 @@ func RegisterListCommand() {
 	list.Flags().BoolP("finish-only", "f", false, "Filters the list to show only jobs with a finish or failed status")
 	list.Flags().Bool("desc", false, "Orders the list of jobs in descending order")
 	list.Flags().IntP("limit", "l", 0, "Sets a maximum number of jobs to return")
+	list.Flags().IntP("page", "p", 0, "Create pagination of jobs based on limit option")
 	list.Flags().Bool("count", false, "Returns only the total count of jobs instead of the full list")
 	list.Flags().BoolP("to-json", "j", false, "Print the list to stringify JSON")
 
