@@ -155,6 +155,23 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		slices.Reverse(jobIDSlice)
 	}
 
+	if statusRequest.Limit > 0 {
+		start := 0
+		end := statusRequest.Limit
+
+		if statusRequest.Page > 0 {
+			start = (statusRequest.Page - 1) * statusRequest.Limit
+			end = start + statusRequest.Limit
+		}
+
+		if start >= len(jobIDSlice) {
+			jobIDSlice = []string{}
+		} else {
+			end = min(end, len(jobIDSlice))
+			jobIDSlice = jobIDSlice[start:end]
+		}
+	}
+
 	allJobs := []payload.JobResponse{}
 	for _, id := range jobIDSlice {
 		if statusRequest.FinishOnly && statusRequest.ActiveOnly {
