@@ -20,7 +20,12 @@ type JobSearchMetadata struct {
 	// Cannot be combined with ActiveOnly.
 	FinishOnly bool `json:"finish_only,omitempty"`
 
-	// Limit sets the maximum number of results to return.
+	// Page specifies the page number for pagination. When set,
+	// the Limit field will be used to determine the maximum number of results per page.
+	Page int `json:"page,omitempty"`
+
+	// Limit sets the overall maximum number of results to return.
+	// When pagination is enabled via the Page field, it determines the maximum number of results per page.
 	Limit int `json:"limit,omitempty"`
 
 	// When true, indicates that only the count of matching jobs should be returned.
