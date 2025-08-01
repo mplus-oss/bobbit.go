@@ -21,7 +21,11 @@ func RegisterListCommand() {
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
 			}
-			orderDesc, err := cmd.Flags().GetBool("order-desc")
+			finishOnly, err := cmd.Flags().GetBool("finish-only")
+			if err != nil {
+				shell.Fatalfln(3, "%v", err)
+			}
+			orderDesc, err := cmd.Flags().GetBool("desc")
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
 			}
@@ -45,6 +49,7 @@ func RegisterListCommand() {
 				Limit:       limitJob,
 				NumberOnly:  countJob,
 				OrderDesc:   orderDesc,
+				FinishOnly:  finishOnly,
 			}
 			if err := cli.BuildPayload(&p, req); err != nil {
 				shell.Fatalfln(3, "Failed to build payload: %v", err)
@@ -106,9 +111,10 @@ func RegisterListCommand() {
 		},
 	}
 
-	list.Flags().Bool("active-only", false, "Filters the list to show only jobs with a running or active status")
-	list.Flags().Bool("order-desc", false, "Orders the list of jobs in descending order")
-	list.Flags().Int("limit", 0, "Sets a maximum number of jobs to return")
+	list.Flags().BoolP("active-only", "a", false, "Filters the list to show only jobs with a running or active status")
+	list.Flags().BoolP("finish-only", "f", false, "Filters the list to show only jobs with a finish or failed status")
+	list.Flags().Bool("desc", false, "Orders the list of jobs in descending order")
+	list.Flags().IntP("limit", "l", 0, "Sets a maximum number of jobs to return")
 	list.Flags().Bool("count", false, "Returns only the total count of jobs instead of the full list")
 	list.Flags().BoolP("to-json", "j", false, "Print the list to stringify JSON")
 

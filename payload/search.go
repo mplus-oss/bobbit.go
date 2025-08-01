@@ -13,7 +13,12 @@ type JobSearchMetadata struct {
 	Search string `json:"search,omitempty"`
 
 	// ActiveOnly filters results to include only active jobs.
+	// Cannot be combined with FinishOnly.
 	ActiveOnly bool `json:"active_only,omitempty"`
+
+	// FinishOnly filters results to include only finished jobs whether job is success or failed.
+	// Cannot be combined with ActiveOnly.
+	FinishOnly bool `json:"finish_only,omitempty"`
 
 	// Limit sets the maximum number of results to return.
 	Limit int `json:"limit,omitempty"`

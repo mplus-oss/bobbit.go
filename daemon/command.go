@@ -114,6 +114,8 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 // ListJob handles requests to list jobs. It reads job data from the configured
 // directory, filters them based on `JobSearchMetadata` criteria (e.g., active only, limit),
 // parses their status and optional metadata, sorts them, and sends the results back to the client.
+//
+// Check payload.JobSearchMetadata for more information.
 func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	p := jc.Payload
 
@@ -145,6 +147,10 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 
 	allJobs := []payload.JobResponse{}
 	for id := range jobIDs {
+		if statusRequest.FinishOnly && statusRequest.ActiveOnly {
+			continue
+		}
+
 		metadata, err := ParseJobDataFilename(id)
 		if err != nil {
 			log.Println(err)
@@ -166,6 +172,10 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 			}
 		}
 
+		if statusRequest.FinishOnly && status.Status == payload.JOB_RUNNING {
+			continue
+		}
+
 		if statusRequest.ActiveOnly && status.Status != payload.JOB_RUNNING {
 			continue
 		}
@@ -177,9 +187,9 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	}
 	sort.Slice(allJobs, func(i, j int) bool {
 		if statusRequest.OrderDesc {
-			return allJobs[i].Timestamp.Before(allJobs[j].Timestamp)
-		} else {
 			return allJobs[j].Timestamp.Before(allJobs[i].Timestamp)
+		} else {
+			return allJobs[i].Timestamp.Before(allJobs[j].Timestamp)
 		}
 	})
 
