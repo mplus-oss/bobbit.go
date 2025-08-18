@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/mplus-oss/bobbit.go/internal/lib"
@@ -93,6 +95,9 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	cmd.Stdout = logOutput
 	cmd.Stderr = logOutput
 
+	// Make it as a different group
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
 	// Add job-specific environment variables
 	cmd.Env = append(
 		os.Environ(),
@@ -101,7 +106,15 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 		fmt.Sprintf("JOB_METADATA=%s", metadataStr),
 	)
 
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
+		return &DaemonPayloadError{"Failed when starting command", payload.ID, err}
+	}
+
+	if err := os.WriteFile(lockFile, fmt.Appendf([]byte{}, "%d", cmd.Process.Pid), 0644); err != nil {
+		return err
+	}
+
+	if err := cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
@@ -327,6 +340,55 @@ func (d *DaemonStruct) StatusJob(jc *JobContext) error {
 		return &DaemonPayloadError{"Failed to parse exit code", job.JobName, err}
 	}
 	if err := jc.SendPayload(finalStatus); err != nil {
+		return &DaemonError{"Invalid metadata: Failed to send payload", err}
+	}
+
+	return nil
+}
+
+// StopJob handles requests to stop the specific job.
+// If the job exist, the return is JobResponse. If the job not exist, the return is an empty JobResponse.
+func (d *DaemonStruct) StopJob(jc *JobContext) error {
+	p := jc.Payload
+
+	var statusRequest payload.JobSearchMetadata
+	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
+		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
+	}
+
+	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
+	if err != nil {
+		return &DaemonError{"Failed to find job data", err}
+	}
+
+	resp := payload.JobResponse{JobDetailMetadata: job}
+	if err := ParseExitCode(d.BobbitConfig, &resp); err != nil {
+		return &DaemonError{"Failed to parse exitcode", err}
+	}
+
+	// Send empty response
+	if resp.Status != payload.JOB_RUNNING {
+		if err := jc.SendPayload(payload.JobResponse{}); err != nil {
+			return &DaemonError{"Invalid metadata: Failed to send payload", err}
+		}
+		return nil
+	}
+
+	log.Printf("Entering StopJob Context: %v\n", job)
+	pidBytes, err := os.ReadFile(GenerateJobDataFilename(d.BobbitConfig, job, DAEMON_LOCKFILE))
+	if err != nil {
+		return err
+	}
+	pid, err := strconv.Atoi(string(pidBytes))
+	if err != nil {
+		return err
+	}
+
+	if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
+		return err
+	}
+
+	if err := jc.SendPayload(resp); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 
