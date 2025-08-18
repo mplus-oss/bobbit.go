@@ -19,6 +19,9 @@ const (
 	REQUEST_STATUS
 	// REQUEST_VIBE_CHECK indicates a request to perform a health or liveness check. Return of this request is void.
 	REQUEST_VIBE_CHECK
+	// REQUEST_STOP indicates a request to stop a job.
+	// If the job exist, the return is JobResponse. If the job not exist, the return is an empty JobResponse.
+	REQUEST_STOP
 )
 
 // PayloadRegularMetadata is a type alias for any, used to hold arbitrary metadata
