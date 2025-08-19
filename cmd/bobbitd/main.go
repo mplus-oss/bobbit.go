@@ -32,7 +32,7 @@ func init() {
 			log.Fatalln(err)
 		}
 
-		if (fixLogfile) {
+		if fixLogfile {
 			if err := handleFixLogFile(); err != nil {
 				log.Fatalln(err)
 			}

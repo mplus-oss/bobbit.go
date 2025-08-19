@@ -34,7 +34,7 @@ func handleFixLogFile() error {
 		jobs[jobName] = true
 	}
 
-	for job, _ := range jobs {
+	for job := range jobs {
 		log.Printf("Fixing: %v\n", job)
 
 		hash, err := lib.GenerateRandomHash(16)
@@ -49,7 +49,7 @@ func handleFixLogFile() error {
 			Timestamp: timeNow,
 		}
 
-		checkingPath := func (ext daemon.DaemonFileTypeEnum) error {
+		checkingPath := func(ext daemon.DaemonFileTypeEnum) error {
 			checkedPath := filepath.Join(c.DataDir, job+"."+string(ext))
 			if _, err := os.Stat(checkedPath); !errors.Is(err, os.ErrNotExist) {
 				newfilepath := daemon.GenerateJobDataFilename(c, jobDetail, ext)
@@ -60,7 +60,7 @@ func handleFixLogFile() error {
 			}
 			return nil
 		}
-		
+
 		if err := checkingPath(daemon.DAEMON_LOGFILE); err != nil {
 			log.Println(err)
 			continue
