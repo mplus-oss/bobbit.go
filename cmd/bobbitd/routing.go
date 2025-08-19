@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/mplus-oss/bobbit.go/daemon"
@@ -8,32 +9,35 @@ import (
 )
 
 func RouteHandler(d *daemon.DaemonStruct, jc *daemon.JobContext) {
+	var err error
+
 	switch r := jc.Payload.Request; r {
 	case payload.REQUEST_VIBE_CHECK:
-		if err := d.HandleVibeCheck(jc); err != nil {
-			log.Println(err)
-		}
+		err = d.HandleVibeCheck(jc)
+
 	case payload.REQUEST_EXECUTE_JOB:
-		if err := d.HandleJob(jc); err != nil {
-			log.Println(err)
-		}
+		err = d.HandleJob(jc)
+
 	case payload.REQUEST_LIST:
-		if err := d.ListJob(jc); err != nil {
-			log.Println(err)
-		}
+		err = d.ListJob(jc)
+
 	case payload.REQUEST_WAIT:
-		if err := d.WaitJob(jc); err != nil {
-			log.Println(err)
-		}
+		err = d.WaitJob(jc)
+
 	case payload.REQUEST_STATUS:
-		if err := d.StatusJob(jc); err != nil {
-			log.Println(err)
-		}
+		err = d.StatusJob(jc)
+
 	case payload.REQUEST_STOP:
-		if err := d.StopJob(jc); err != nil {
-			log.Println(err)
-		}
+		err = d.StopJob(jc)
+
 	default:
-		log.Printf("WARNING: Outbound request: %+v", jc)
+		err = fmt.Errorf("Outbound request: %v", jc)
+	}
+
+	if err == nil {
+		return
+	}
+	if err := jc.SendPayload(payload.JobErrorResponse{Error: err.Error()}); err != nil {
+		log.Println(err)
 	}
 }
