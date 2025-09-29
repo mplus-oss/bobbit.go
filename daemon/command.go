@@ -308,8 +308,17 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	if err := jc.SendPayload(resp); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
-
 	log.Printf("Job waiting finish: %v\n", job)
+
+	// Send FIN/Half-Close Connection
+	if unixConn, ok := jc.conn.(*net.UnixConn); ok {
+		if err := unixConn.CloseWrite(); err != nil {
+			log.Printf("Warning: Failed to CloseWrite the job: %v\n", err)
+		}
+	}
+	if _, err = io.Copy(io.Discard, jc.conn); err != nil {
+		log.Printf("EOF Connection: %v\n", err)
+	}
 	return nil
 }
 

@@ -3,7 +3,6 @@ package client
 import (
 	"encoding/json"
 	"errors"
-	"io"
 	"net"
 
 	"github.com/mplus-oss/bobbit.go/config"
@@ -52,14 +51,19 @@ func (d *DaemonConnectionStruct) SendPayload(target any) error {
 // GetPayload decodes the response from the daemon connection into the provided target object.
 // It returns an error if decoding fails.
 func (d *DaemonConnectionStruct) GetPayload(target any) error {
-	body, err := io.ReadAll(d.Connection)
-	if err != nil {
-		return err
-	}
+	decoder := json.NewDecoder(d.Connection)
+	if err := decoder.Decode(target); err != nil {
+		var raw json.RawMessage
+		if err := decoder.Decode(&raw); err != nil {
+			return err
+		}
 
-	if err := json.Unmarshal(body, target); err != nil {
+		if err := json.Unmarshal(raw, target); err == nil {
+			return nil
+		}
+
 		var errorPayload payload.JobErrorResponse
-		if json.Unmarshal(body, &errorPayload) == nil && errorPayload.Error != "" {
+		if json.Unmarshal(raw, &errorPayload) == nil && errorPayload.Error != "" {
 			return errors.New(errorPayload.Error)
 		}
 
