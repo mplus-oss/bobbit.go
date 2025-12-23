@@ -29,7 +29,7 @@ func RegisterListCommand() {
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
 			}
-			limitJob, err := cmd.Flags().GetInt("limit")
+			countMaxJob, err := cmd.Flags().GetInt("count")
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
 			}
@@ -37,7 +37,7 @@ func RegisterListCommand() {
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
 			}
-			countJob, err := cmd.Flags().GetBool("count")
+			jobNumberOnly, err := cmd.Flags().GetBool("total")
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
 			}
@@ -50,9 +50,9 @@ func RegisterListCommand() {
 			req := payload.JobSearchMetadata{
 				RequestMeta: false,
 				ActiveOnly:  activeOnly,
-				Limit:       limitJob,
+				Limit:       countMaxJob,
 				Page:        pageJob,
-				NumberOnly:  countJob,
+				NumberOnly:  jobNumberOnly,
 				OrderDesc:   orderDesc,
 				FinishOnly:  finishOnly,
 			}
@@ -64,7 +64,7 @@ func RegisterListCommand() {
 				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
 			}
 
-			if countJob {
+			if jobNumberOnly {
 				var resp payload.JobResponseCount
 				if err := cli.GetPayload(&resp); err != nil {
 					shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
@@ -119,9 +119,9 @@ func RegisterListCommand() {
 	list.Flags().BoolP("active-only", "a", false, "Filters the list to show only jobs with a running or active status")
 	list.Flags().BoolP("finish-only", "f", false, "Filters the list to show only jobs with a finish or failed status")
 	list.Flags().Bool("desc", false, "Orders the list of jobs in descending order")
-	list.Flags().IntP("limit", "l", 0, "Sets a maximum number of jobs to return")
+	list.Flags().IntP("count", "n", 0, "Sets a maximum number of jobs to return")
 	list.Flags().IntP("page", "p", 0, "Create pagination of jobs based on limit option")
-	list.Flags().Bool("count", false, "Returns only the total count of jobs instead of the full list")
+	list.Flags().Bool("total", false, "Returns only the total count of jobs instead of the full list")
 	list.Flags().BoolP("to-json", "j", false, "Print the list to stringify JSON")
 
 	cmd.AddCommand(list)
