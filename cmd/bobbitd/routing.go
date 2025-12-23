@@ -9,30 +9,39 @@ import (
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
+// RouteHandlerMap handling job route for (daemon.JobContext).Handler
+//
+// Some job don't need to verbose every single action. This map help the middleware to make
+// route discovery more easier.
+//
+// See: const main.RunJob:ignoredRoutes
+type RouteHandlerMap map[payload.PayloadRequestEnum]func(*daemon.JobContext) error
+
 func RouteHandler(d *daemon.DaemonStruct, jc *daemon.JobContext) {
-	handlers := map[payload.PayloadRequestEnum]struct {
-		Name    string
-		Handler func(*daemon.JobContext) error
-	}{
-		payload.REQUEST_VIBE_CHECK:  {"VIBE_CHECK", d.HandleVibeCheck},
-		payload.REQUEST_LIST:        {"LIST", d.ListJob},
-		payload.REQUEST_EXECUTE_JOB: {"EXECUTE", d.HandleJob},
-		payload.REQUEST_WAIT:        {"WAIT", d.WaitJob},
-		payload.REQUEST_STATUS:      {"STATUS", d.StatusJob},
-		payload.REQUEST_STOP:        {"STOP", d.StopJob},
+	handlers := RouteHandlerMap{
+		payload.REQUEST_VIBE_CHECK:  d.HandleVibeCheck,
+		payload.REQUEST_LIST:        d.ListJob,
+		payload.REQUEST_EXECUTE_JOB: d.HandleJob,
+		payload.REQUEST_WAIT:        d.WaitJob,
+		payload.REQUEST_STATUS:      d.StatusJob,
+		payload.REQUEST_STOP:        d.StopJob,
 	}
 
-	var err error
+	var (
+		err   error
+		hName string
+	)
 
 	h, exists := handlers[jc.Payload.Request]
 	if exists {
-		err = RunJob(d, jc, h.Name, h.Handler)
+		hName = payload.ParsePayloadRequest(jc.Payload.Request)
+		err = RunJob(d, jc, hName, h)
 	} else {
 		err = fmt.Errorf("Outbound request: %v", jc.Payload.Request)
 	}
 
 	if err != nil {
-		log.Printf("Error processing %v: %v", h.Name, err)
+		log.Printf("Error processing %v: %v", hName, err)
 		if sendErr := jc.SendPayload(payload.JobErrorResponse{Error: err.Error()}); sendErr != nil {
 			log.Println("Failed to send error response:", sendErr)
 		}

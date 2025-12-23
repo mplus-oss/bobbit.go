@@ -36,24 +36,10 @@ func RegisterStatusCommand() {
 				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
 			}
 
-			var status string
-			switch job.Status {
-			case payload.JOB_FAILED:
-				status = "Failed"
-			case payload.JOB_FINISH:
-				status = "Finished"
-			case payload.JOB_NOT_RUNNING:
-				status = "Not running"
-			case payload.JOB_RUNNING:
-				status = "Running"
-			default:
-				status = "Unknown"
-			}
-
 			shell.Printf("Status for Job: %s\n", job.JobName)
 			shell.Printf("------------------------\n")
 			shell.Printf("  ID:        %s\n", job.ID)
-			shell.Printf("  Status:    %s\n", status)
+			shell.Printf("  Status:    %s\n", payload.ParseJobStatus(job.Status))
 			shell.Printf("  Exit Code: %d\n", job.ExitCode)
 			shell.Printf("  Timestamp: %s\n", job.Timestamp.Format(time.RFC3339))
 			if showMetadata && job.Metadata != nil {

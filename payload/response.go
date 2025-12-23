@@ -34,3 +34,19 @@ type JobResponseCount struct {
 	// Count is the total number of jobs matching the criteria.
 	Count int `json:"count"`
 }
+
+func ParseJobStatus(jobStatus JobStatusEnum) (status string) {
+	switch jobStatus {
+	case JOB_FAILED:
+		status = "Failed"
+	case JOB_FINISH:
+		status = "Finished"
+	case JOB_NOT_RUNNING:
+		status = "Not running"
+	case JOB_RUNNING:
+		status = "Running"
+	default:
+		status = "Unknown"
+	}
+	return status
+}
