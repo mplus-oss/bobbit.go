@@ -9,8 +9,7 @@ import (
 )
 
 var (
-	c   = config.New()
-	cli = client.New(c)
+	cli = client.New(config.NewClient())
 	cmd = &cobra.Command{
 		Use:   "bobbit",
 		Short: "Simply \"yet\" UNIX Socket based job runner",
