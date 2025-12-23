@@ -49,7 +49,7 @@ func startDaemon() {
 		log.Fatalln(err)
 	}
 
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go d.CleanupDaemon(sigChan)
 	log.Println("Daemon started, waiting for response.")
 
@@ -59,13 +59,14 @@ func startDaemon() {
 			log.Printf("Failed to receive connection: %v", err)
 			continue
 		}
-		defer conn.Close()
 
 		go handleConnection(d, conn)
 	}
 }
 
 func handleConnection(d *daemon.DaemonStruct, conn net.Conn) {
+	defer conn.Close()
+
 	jobCtx := d.NewJobContext(conn)
 	defer jobCtx.Close()
 
