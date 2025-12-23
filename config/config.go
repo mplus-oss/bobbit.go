@@ -6,16 +6,20 @@ import (
 	"github.com/mplus-oss/bobbit.go/internal/lib"
 )
 
-// BobbitConfig holds the configuration parameters for the Bobbit daemon.
+// BobbitConfig holds the configuration parameters for the Bobbit.
 type BobbitConfig struct {
-	// SocketPath specifies the file system path for the Unix domain socket.
-	SocketPath string
+	// Deprecated: See config.BobbitDaemonConfig.DataPath
+	//
 	// DataDir specifies the directory where job-related data (logs, metadata, lock files) are stored.
 	DataDir string
+	// SocketPath specifies the file system path for the Unix domain socket.
+	SocketPath string
 	// DebugMode indicates whether the daemon should run in debug mode, enabling verbose logging.
 	DebugMode bool
 }
 
+// Deprecated: See config.BaseConfig(), config.NewDaemon(), config.NewClient()
+//
 // New creates and initializes a new BobbitConfig instance.
 // It retrieves configuration values from environment variables or uses default paths.
 // Specifically, it looks for "BOBBIT_DATA_DIR" for the data directory
@@ -29,6 +33,18 @@ func New() BobbitConfig {
 
 	return BobbitConfig{
 		DataDir:    lib.GetDefaultEnv("BOBBIT_DATA_DIR", "/tmp/bobbitd"),
+		SocketPath: lib.GetDefaultEnv("BOBBIT_SOCKET_PATH", "/tmp/bobbitd.sock"),
+		DebugMode:  debug,
+	}
+}
+
+func BaseConfig() BobbitConfig {
+	debug := false
+	if env := os.Getenv("DEBUG"); env != "" {
+		debug = true
+	}
+
+	return BobbitConfig{
 		SocketPath: lib.GetDefaultEnv("BOBBIT_SOCKET_PATH", "/tmp/bobbitd.sock"),
 		DebugMode:  debug,
 	}
