@@ -18,6 +18,8 @@ import (
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
+type HandlerFunc func(jc *JobContext) error
+
 // HandleVibeCheck handles a "vibe check" request, which typically serves as a basic
 // ping to confirm the daemon is responsive. It unmarshals the request metadata.
 func (d *DaemonStruct) HandleVibeCheck(jc *JobContext) error {
@@ -59,7 +61,6 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	exitCodeFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_EXITCODE)
 	metadataFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_METADATA)
 
-	log.Printf("Entering HandleJob Context: %v", jc)
 	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
 		return &DaemonPayloadError{"Failed to create lockfile", payload.ID, err}
 	}
@@ -120,12 +121,15 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 		} else {
 			exitCode = 127
 		}
+
+		if exitCode > 0 {
+			return &DaemonPayloadError{"Exit with code", payload.ID, fmt.Errorf("code: %d", exitCode)}
+		}
 	}
 
 	if err := os.WriteFile(exitCodeFile, fmt.Appendf([]byte{}, "%d", exitCode), 0644); err != nil {
 		(&DaemonPayloadError{"Failed to create exitcode file. Please handle it manually.", payload.ID, err}).Warning()
 	}
-	log.Printf("DONE: %s %s exit=%d", payload.ID, payload.JobName, exitCode)
 	return nil
 }
 
@@ -147,7 +151,6 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		return &DaemonError{"Failed to read bobbit directory", err}
 	}
 
-	log.Printf("Entering ListJob Context: %v", jc)
 	jobIDs := make(map[string]bool)
 	// Collect unique job IDs from the filenames
 	for _, file := range files {
@@ -247,7 +250,6 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		}
 	}
 
-	log.Println("DONE: LIST")
 	return nil
 }
 
@@ -276,7 +278,6 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	}
 
 	lockFile := GenerateJobDataFilename(d.BobbitConfig, job, DAEMON_LOCKFILE)
-	log.Printf("Entering WaitJob Context: %v\n", job)
 	for {
 		// Set a short read deadline to check for client disconnection without blocking indefinitely
 		oneByte := make([]byte, 1)
@@ -383,7 +384,6 @@ func (d *DaemonStruct) StopJob(jc *JobContext) error {
 		return nil
 	}
 
-	log.Printf("Entering StopJob Context: %v\n", job)
 	pidBytes, err := os.ReadFile(GenerateJobDataFilename(d.BobbitConfig, job, DAEMON_LOCKFILE))
 	if err != nil {
 		return err
