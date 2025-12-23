@@ -74,7 +74,6 @@ func handleConnection(d *daemon.DaemonStruct, conn net.Conn) {
 		log.Println(err)
 		return
 	}
-	log.Printf("Job received: %+v", jobCtx.Payload)
 
 	RouteHandler(d, jobCtx)
 }
