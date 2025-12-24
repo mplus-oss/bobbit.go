@@ -43,6 +43,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	if p.JobName == "" || len(p.Command) < 1 {
 		return &DaemonError{"Invalid p: JobName or Command not provided", nil}
 	}
+
 	// Generate a unique ID if not provided
 	if p.ID == "" {
 		hash, err := lib.GenerateRandomHash(32)
@@ -50,6 +51,12 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 			return &DaemonError{"Failed to create Hash for job", err}
 		}
 		p.ID = hash
+	}
+
+	// Set timestamp if not provided. This is for logfile path.
+	if p.CreatedAt.IsZero() {
+		p.CreatedAt = jc.Payload.Timestamp
+		p.UpdatedAt = jc.Payload.Timestamp
 	}
 
 	// Marshal and write job metadata
