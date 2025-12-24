@@ -12,6 +12,25 @@ import (
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
+// GenerateJobLogPath will generate full path of log path.
+// It automatically creates the parent directories if they do not exist.
+func GenerateJobLogPath(c config.BobbitDaemonConfig, p payload.JobDetailMetadata) string {
+	fullPath := filepath.Join(
+		c.DataPath, "logs",
+		strconv.Itoa(p.CreatedAt.Year()),
+		fmt.Sprintf("%02d", p.CreatedAt.Month()),
+		p.ID,
+		string(DAEMON_LOGFILE),
+	)
+
+	dir := filepath.Dir(fullPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return ""
+	}
+
+	return fullPath
+}
+
 // GenerateJobDataFilename generates a filename for job-related data based on the provided configuration, job metadata, and file type.
 func GenerateJobDataFilename(c config.BobbitConfig, p payload.JobDetailMetadata, extFile DaemonFileTypeEnum) string {
 	return filepath.Join(
