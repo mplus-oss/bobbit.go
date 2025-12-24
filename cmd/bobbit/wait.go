@@ -28,18 +28,8 @@ func RegisterWaitCommand() {
 				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
 			}
 
-			if job.Status != payload.JOB_RUNNING {
-				var status string
-				switch job.Status {
-				case payload.JOB_FAILED:
-					status = "Failed"
-				case payload.JOB_FINISH:
-					status = "Finished"
-				case payload.JOB_NOT_RUNNING:
-					status = "Not running"
-				}
-				shell.Printfln("Job %s is finished with status \"%s\".", args[0], status)
-			}
+			status := payload.ParseJobStatus(job.Status)
+			shell.Printfln("Job %s is finished with status \"%s\".", args[0], status)
 		},
 	})
 }
