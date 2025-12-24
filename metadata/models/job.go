@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -14,8 +15,8 @@ import (
 type JobModel struct {
 	ID        string    `db:"id"`
 	JobName   string    `db:"job_name"`
-	Command   string    `db:"command"` // JSON string representation of []string
-	Status    int       `db:"status"`  // Integer cast from JobStatusEnum
+	Command   string    `db:"command"`    // JSON string representation of []string
+	Status    int       `db:"status"`     // Integer cast from JobStatusEnum
 	ExitCode  int       `db:"exit_code"`
 	Metadata  string    `db:"metadata"`   // JSON string representation of PayloadRegularMetadata
 	CreatedAt time.Time `db:"created_at"` // Generated automatically (current_timestamp)
@@ -31,6 +32,13 @@ func (j *JobModel) Save() error {
 	`
 	_, err := j.DB.NamedExec(query, j)
 	return err
+}
+
+func (j *JobModel) Delete() {
+	_, err := j.DB.NamedExec("DELETE FROM jobs WHERE id = :id", j)
+	if err != nil {
+		log.Printf("[WARNING] Failed to delete %s job: %v", j.ID, err)
+	}
 }
 
 // Get fetch the job data from the table and return it as a array of JobModel.
@@ -72,7 +80,7 @@ func (j *JobModel) Get(filter *DBGetFilter) ([]*JobModel, error) {
 //
 // NOTE: Ensure that 'Command' and 'Metadata' fields (strings) are updated
 // with the latest JSON content before calling this method.
-func (j *JobModel) Update(db *sqlx.DB) error {
+func (j *JobModel) Update() error {
 	query := `
 		UPDATE jobs 
 		SET 
@@ -84,7 +92,7 @@ func (j *JobModel) Update(db *sqlx.DB) error {
 		WHERE id = :id
 	`
 
-	_, err := db.NamedExec(query, j)
+	_, err := j.DB.NamedExec(query, j)
 	if err != nil {
 		return fmt.Errorf("failed to update job %s: %w", j.ID, err)
 	}
@@ -96,15 +104,14 @@ func (j *JobModel) Update(db *sqlx.DB) error {
 //
 // To use this function, the required property is `JobModel.ID` and `JobModel.ExitCode`.
 func (j *JobModel) MarkJobFinished() error {
-	status := payload.JOB_RUNNING
 	if j.ExitCode == 0 {
-		status = payload.JOB_FINISH
+		j.Status = int(payload.JOB_FINISH)
 	} else {
-		status = payload.JOB_FAILED
+		j.Status = int(payload.JOB_FAILED)
 	}
 
-	query := `UPDATE jobs SET status = ?, exit_code = ? WHERE id = ?`
-	if _, err := j.DB.Exec(query, status, j.ExitCode, j.ID); err != nil {
+	query := `UPDATE jobs SET status = :status, exit_code = :exit_code WHERE id = :id`
+	if _, err := j.DB.NamedExec(query, j); err != nil {
 		return fmt.Errorf("failed to mark job %s as finished: %w", j.ID, err)
 	}
 
