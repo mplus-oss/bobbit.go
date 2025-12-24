@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mplus-oss/bobbit.go/daemon"
+	"github.com/mplus-oss/bobbit.go/internal/lib"
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
@@ -53,8 +54,11 @@ func RunJob(d *daemon.DaemonStruct, jc *daemon.JobContext, name string, handler 
 	const ignoredRoutes = payload.REQUEST_LIST | payload.REQUEST_VIBE_CHECK
 	shouldLog := d.DebugMode || !((ignoredRoutes & jc.Payload.Request) > 0)
 
+	// Add hash for logging
+	hash, _ := lib.GenerateRandomHash(8)
+
 	if shouldLog {
-		log.Printf("Entering Context: %s: %+v", name, jc.Payload)
+		log.Printf("[%s] Entering Context: %s: %+v", hash, name, jc.Payload)
 	}
 
 	start := time.Now()
@@ -63,9 +67,9 @@ func RunJob(d *daemon.DaemonStruct, jc *daemon.JobContext, name string, handler 
 	if shouldLog {
 		duration := time.Since(start)
 		if err != nil {
-			log.Printf("FAILED: %s | Took: %v | Error: %v", name, duration, err)
+			log.Printf("[%s] FAILED: %s | Took: %v | Error: %v", hash, name, duration, err)
 		} else {
-			log.Printf("DONE: %s | Took: %v", name, duration)
+			log.Printf("[%s] DONE: %s | Took: %v", hash, name, duration)
 		}
 	}
 
