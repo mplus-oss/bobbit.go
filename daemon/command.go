@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mplus-oss/bobbit.go/internal/lib"
+	"github.com/mplus-oss/bobbit.go/metadata/models"
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
@@ -34,65 +35,62 @@ func (d *DaemonStruct) HandleVibeCheck(jc *JobContext) error {
 // generates a unique ID if not provided, creates necessary data files (lock, log, metadata),
 // executes the command, captures its output and exit code, and cleans up the lock file.
 func (d *DaemonStruct) HandleJob(jc *JobContext) error {
-	var payload payload.JobDetailMetadata
-	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {
+	var p payload.JobDetailMetadata
+	if err := jc.Payload.UnmarshalMetadata(&p); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
-	if payload.JobName == "" || len(payload.Command) < 1 {
-		return &DaemonError{"Invalid payload: JobName or Command not provided", nil}
+	if p.JobName == "" || len(p.Command) < 1 {
+		return &DaemonError{"Invalid p: JobName or Command not provided", nil}
 	}
 	// Generate a unique ID if not provided
-	if payload.ID == "" {
-		hash, err := lib.GenerateRandomHash(16)
+	if p.ID == "" {
+		hash, err := lib.GenerateRandomHash(32)
 		if err != nil {
 			return &DaemonError{"Failed to create Hash for job", err}
 		}
-		payload.ID = hash
-	}
-	// Set timestamp if not provided
-	if payload.Timestamp.IsZero() {
-		payload.Timestamp = jc.Payload.Timestamp
+		p.ID = hash
 	}
 
-	// Generate file paths for job-related data
-	lockFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_LOCKFILE)
-	logFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_LOGFILE)
-	exitCodeFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_EXITCODE)
-	metadataFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_METADATA)
-
-	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
-		return &DaemonPayloadError{"Failed to create lockfile", payload.ID, err}
-	}
-	defer os.Remove(lockFile)
-
+	// Marshal and write job metadata
 	metadataStr := ""
-	// Marshal and write job metadata to a file
-	if payload.Metadata != nil {
-		metaByte, err := json.Marshal(payload.Metadata)
+	if p.Metadata != nil {
+		metaByte, err := json.Marshal(p.Metadata)
 		if err != nil {
-			return &DaemonPayloadError{"Failed to marshal metadata", payload.ID, err}
-		}
-
-		if err := os.WriteFile(metadataFile, metaByte, 0644); err != nil {
-			return &DaemonPayloadError{"Failed to create metadata file", payload.ID, err}
+			return &DaemonPayloadError{"Failed to marshal metadata", p.ID, err}
 		}
 
 		metadataStr = string(metaByte)
 	}
 
+	// Prepare the logfile
+	logFile := GenerateJobLogPath(jc.daemon.BobbitDaemonConfig, p)
 	logOutput, err := os.Create(logFile)
 	if err != nil {
-		return &DaemonPayloadError{"Failed to create logfile", payload.ID, err}
+		return &DaemonPayloadError{"Failed to create logfile", p.ID, err}
 	}
 	defer logOutput.Close()
 
-	exitCode := 0
-	if len(payload.Command) == 0 {
-		return &DaemonPayloadError{"No command provided", payload.ID, err}
+	if len(p.Command) == 0 {
+		return &DaemonPayloadError{"No command provided", p.ID, err}
 	}
 
-	cmd := exec.Command(payload.Command[0], payload.Command[1:]...)
+	// Save the process
+	respPayload := payload.JobResponse{
+		ExitCode:          -1,
+		Status:            payload.JOB_NOT_RUNNING,
+		JobDetailMetadata: p,
+	}
+	job, err := models.NewJobModel(jc.daemon.DB, respPayload)
+	if err != nil {
+		return &DaemonPayloadError{"Failed when initialize db model", p.ID, err}
+	}
+	if err := job.Save(); err != nil {
+		return &DaemonPayloadError{"Failed when creating job record", p.ID, err}
+	}
+
+	// Prep the output
+	cmd := exec.Command(p.Command[0], p.Command[1:]...)
 	cmd.Stdout = logOutput
 	cmd.Stderr = logOutput
 
@@ -102,34 +100,35 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	// Add job-specific environment variables
 	cmd.Env = append(
 		os.Environ(),
-		fmt.Sprintf("JOB_ID=%s", payload.ID),
-		fmt.Sprintf("JOB_NAME=%s", payload.JobName),
+		fmt.Sprintf("JOB_ID=%s", p.ID),
+		fmt.Sprintf("JOB_NAME=%s", p.JobName),
 		fmt.Sprintf("JOB_METADATA=%s", metadataStr),
 	)
 
+	log.Printf("Starting Job: %+v", p)
 	if err := cmd.Start(); err != nil {
-		return &DaemonPayloadError{"Failed when starting command", payload.ID, err}
-	}
-
-	if err := os.WriteFile(lockFile, fmt.Appendf([]byte{}, "%d", cmd.Process.Pid), 0644); err != nil {
-		return err
+		job.Delete()
+		return &DaemonPayloadError{"Failed when starting command", p.ID, err}
 	}
 
 	if err := cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
+			job.ExitCode = exitErr.ExitCode()
 		} else {
-			exitCode = 127
+			job.ExitCode = 127
 		}
-
-		if exitCode > 0 {
-			return &DaemonPayloadError{"Exit with code", payload.ID, fmt.Errorf("code: %d", exitCode)}
-		}
+	} else {
+		job.ExitCode = 0
 	}
 
-	if err := os.WriteFile(exitCodeFile, fmt.Appendf([]byte{}, "%d", exitCode), 0644); err != nil {
-		(&DaemonPayloadError{"Failed to create exitcode file. Please handle it manually.", payload.ID, err}).Warning()
+	if err := job.MarkJobFinished(); err != nil {
+		return &DaemonPayloadError{"Failed to update job", p.ID, err}
 	}
+
+	if job.ExitCode > 0 {
+		return &DaemonPayloadError{"Exit with code", p.ID, fmt.Errorf("code: %d", job.ExitCode)}
+	}
+
 	return nil
 }
 
