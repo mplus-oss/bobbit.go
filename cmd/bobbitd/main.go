@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	c       = config.New()
+	c       = config.NewDaemon()
 	sigChan = make(chan os.Signal, 1)
 	cmd     = &cobra.Command{
 		Use:   "bobbitd",
@@ -22,22 +22,9 @@ var (
 )
 
 func init() {
-	cmd.Flags().Bool("fix-logfile", false, "Fix logfile for old version")
 	cmd.Run = func(cmd *cobra.Command, args []string) {
-		log.Printf("Directory data: %s", c.DataDir)
+		log.Printf("Directory data: %s", c.DataPath)
 		log.Printf("Socket Path: %s", c.SocketPath)
-
-		fixLogfile, err := cmd.Flags().GetBool("fix-logfile")
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		if fixLogfile {
-			if err := handleFixLogFile(); err != nil {
-				log.Fatalln(err)
-			}
-			return
-		}
 
 		startDaemon()
 	}

@@ -9,7 +9,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/mplus-oss/bobbit.go/config"
+	"github.com/mplus-oss/bobbit.go/metadata"
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
@@ -31,7 +33,8 @@ const (
 // its socket listener and configuration.
 type DaemonStruct struct {
 	SocketListener net.Listener
-	config.BobbitConfig
+	DB             *sqlx.DB
+	config.BobbitDaemonConfig
 }
 
 // JobContext holds the context for a single job request handled by the daemon,
@@ -45,14 +48,14 @@ type JobContext struct {
 // CreateDaemon initializes and starts the daemon. It checks for existing daemon
 // instances, creates necessary data directories, and sets up the Unix socket listener.
 // It returns a pointer to a DaemonStruct or an error if initialization fails.
-func CreateDaemon(c config.BobbitConfig) (*DaemonStruct, error) {
+func CreateDaemon(c config.BobbitDaemonConfig) (*DaemonStruct, error) {
 	if socket, err := os.Stat(c.SocketPath); err == nil {
 		if socket.Mode().Type() == fs.ModeSocket {
 			return nil, &DaemonError{"Daemon is already started", fmt.Errorf("Daemon found in %v", c.SocketPath)}
 		}
 	}
 
-	if err := os.MkdirAll(c.DataDir, 0755); err != nil {
+	if err := os.MkdirAll(c.DataPath, 0755); err != nil {
 		return nil, &DaemonError{"Failed to create data directory", err}
 	}
 
@@ -65,9 +68,15 @@ func CreateDaemon(c config.BobbitConfig) (*DaemonStruct, error) {
 		return nil, &DaemonError{"Failed to listen in socket path", err}
 	}
 
+	db, err := metadata.InitDB(c)
+	if err != nil {
+		return nil, &DaemonError{"Failed to initialize database", err}
+	}
+
 	return &DaemonStruct{
-		SocketListener: listener,
-		BobbitConfig:   c,
+		SocketListener:     listener,
+		DB:                 db,
+		BobbitDaemonConfig: c,
 	}, nil
 }
 

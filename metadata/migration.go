@@ -19,6 +19,7 @@ import (
 var migrationsFS embed.FS
 
 func InitDB(cfg config.BobbitDaemonConfig) (*sqlx.DB, error) {
+	log.Println("Connecting to local database.")
 	db, err := sqlx.Open(
 		"sqlite3",
 		path.Join(cfg.DataPath, "metadata.db"),
@@ -31,7 +32,13 @@ func InitDB(cfg config.BobbitDaemonConfig) (*sqlx.DB, error) {
 	db.SetMaxIdleConns(cfg.DBMaxIdleConn)
 	db.SetConnMaxLifetime(time.Hour)
 
-	return db, runMigration(db)
+	log.Println("Running the migration")
+	err = runMigration(db)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to migrate: %w", err)
+	}
+
+	return db, nil
 }
 
 func runMigration(db *sqlx.DB) error {
@@ -83,4 +90,3 @@ func enablePragma(db *sqlx.DB, pragmas map[string]string) {
 	}
 	log.Println("Database Pragma enabled.")
 }
-
