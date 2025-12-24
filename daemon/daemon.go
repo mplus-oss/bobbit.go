@@ -64,12 +64,12 @@ func CreateDaemon(c config.BobbitDaemonConfig) (*DaemonStruct, error) {
 		return nil, &DaemonError{"Failed to initialize database", err}
 	}
 
+	if err := os.RemoveAll(c.SocketPath); err != nil {
+		return nil, &DaemonError{"Failed to remove old socket path", err}
+	}
 	listener, err := net.Listen("unix", c.SocketPath)
 	if err != nil {
 		return nil, &DaemonError{"Failed to listen in socket path", err}
-	}
-	if err := os.RemoveAll(c.SocketPath); err != nil {
-		return nil, &DaemonError{"Failed to remove old socket path", err}
 	}
 
 	return &DaemonStruct{
