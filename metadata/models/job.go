@@ -14,19 +14,20 @@ import (
 type JobModel struct {
 	ID        string    `db:"id"`
 	JobName   string    `db:"job_name"`
-	Timestamp time.Time `db:"timestamp"`
 	Command   string    `db:"command"` // JSON string representation of []string
 	Status    int       `db:"status"`  // Integer cast from JobStatusEnum
 	ExitCode  int       `db:"exit_code"`
-	Metadata  string    `db:"metadata"` // JSON string representation of PayloadRegularMetadata
+	Metadata  string    `db:"metadata"`   // JSON string representation of PayloadRegularMetadata
+	CreatedAt time.Time `db:"created_at"` // Generated automatically (current_timestamp)
+	UpdatedAt time.Time `db:"updated_at"` // Generated automatically (TRIGGER jobs_update_updated_at)
 	BaseModel
 }
 
 // Save create new data in the table
 func (j *JobModel) Save() error {
 	query := `
-		INSERT INTO jobs (id, job_name, timestamp, command, status, exit_code, metadata)
-		VALUES (:id, :job_name, :timestamp, :command, :status, :exit_code, :metadata)
+		INSERT INTO jobs (id, job_name, command, status, exit_code, metadata)
+		VALUES (:id, :job_name, :command, :status, :exit_code, :metadata)
 	`
 	_, err := j.DB.NamedExec(query, j)
 	return err
@@ -44,9 +45,9 @@ func (j *JobModel) Get(filter *DBGetFilter) ([]*JobModel, error) {
 	}
 
 	if filter.SortDesc {
-		query += " ORDER BY timestamp DESC"
+		query += " ORDER BY created_at DESC"
 	} else {
-		query += " ORDER BY timestamp ASC"
+		query += " ORDER BY created_at ASC"
 	}
 
 	if filter.Limit > 0 {
@@ -76,7 +77,6 @@ func (j *JobModel) Update(db *sqlx.DB) error {
 		UPDATE jobs 
 		SET 
 			job_name = :job_name,
-			timestamp = :timestamp,
 			command = :command,
 			status = :status,
 			exit_code = :exit_code,
@@ -130,11 +130,10 @@ func (j *JobModel) ToPayload() (*payload.JobResponse, error) {
 		Status:   payload.JobStatusEnum(j.Status),
 		ExitCode: j.ExitCode,
 		JobDetailMetadata: payload.JobDetailMetadata{
-			ID:        j.ID,
-			JobName:   j.JobName,
-			Timestamp: j.Timestamp,
-			Command:   cmd,
-			Metadata:  meta,
+			ID:       j.ID,
+			JobName:  j.JobName,
+			Command:  cmd,
+			Metadata: meta,
 		},
 	}, nil
 }
@@ -159,7 +158,6 @@ func NewJobModel(db *sqlx.DB, job payload.JobResponse) (*JobModel, error) {
 	return &JobModel{
 		ID:        job.ID,
 		JobName:   job.JobName,
-		Timestamp: job.Timestamp,
 		Command:   string(cmdBytes),
 		Status:    int(job.Status),
 		ExitCode:  job.ExitCode,
