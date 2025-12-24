@@ -15,13 +15,25 @@ import (
 type JobModel struct {
 	ID        string    `db:"id"`
 	JobName   string    `db:"job_name"`
-	Command   string    `db:"command"`    // JSON string representation of []string
-	Status    int       `db:"status"`     // Integer cast from JobStatusEnum
+	Command   string    `db:"command"` // JSON string representation of []string
+	Status    int       `db:"status"`  // Integer cast from JobStatusEnum
 	ExitCode  int       `db:"exit_code"`
 	Metadata  string    `db:"metadata"`   // JSON string representation of PayloadRegularMetadata
 	CreatedAt time.Time `db:"created_at"` // Generated automatically (current_timestamp)
 	UpdatedAt time.Time `db:"updated_at"` // Generated automatically (TRIGGER jobs_update_updated_at)
 	BaseModel
+}
+
+type JobFilter struct {
+	// ActiveOnly filters results to include only active jobs.
+	// Cannot be combined with FinishOnly.
+	ActiveOnly bool
+
+	// FinishOnly filters results to include only finished jobs whether job is success or failed.
+	// Cannot be combined with ActiveOnly.
+	FinishOnly bool
+
+	DBGetFilter
 }
 
 // Save create new data in the table
@@ -41,14 +53,11 @@ func (j *JobModel) Delete() {
 	}
 }
 
-// Get fetch the job data from the table and return it as a array of JobModel.
-func (j *JobModel) Get(filter *DBGetFilter) ([]*JobModel, error) {
-	query := "SELECT * FROM jobs"
-	args := []any{}
-
+// applyCriteria appends the WHERE logic to the query and returns the updated query and args.
+func (j *JobModel) applyCriteria(query string, args []any, filter *JobFilter) (string, []any) {
 	if filter.ID != "" || filter.Keyword != "" {
 		query += " WHERE id LIKE ? OR job_name LIKE ?"
-		args = append(args, "%"+filter.ID+"%")
+		args = append(args, filter.ID+"%")
 		args = append(args, "%"+filter.Keyword+"%")
 	}
 
@@ -68,12 +77,35 @@ func (j *JobModel) Get(filter *DBGetFilter) ([]*JobModel, error) {
 		}
 	}
 
+	return query, args
+}
+
+// Get fetch the job data from the table and return it as a array of JobModel.
+func (j *JobModel) Get(filter *JobFilter) ([]*JobModel, error) {
+	query := "SELECT * FROM jobs"
+	args := []any{}
+	query, args = j.applyCriteria(query, args, filter)
+
 	var jobs []*JobModel
 	if err := j.DB.Select(&jobs, query, args...); err != nil {
 		return nil, err
 	}
 
 	return jobs, nil
+}
+
+// Get fetch the job data from the table and return it as a int of JobModel size.
+func (j *JobModel) Count(filter *JobFilter) (int, error) {
+	query := "SELECT COUNT(*) FROM jobs"
+	args := []any{}
+	query, args = j.applyCriteria(query, args, filter)
+
+	var count int
+	if err := j.DB.Get(&count, query, args...); err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 // Update persists the current state of the JobModel to the database.
@@ -137,12 +169,37 @@ func (j *JobModel) ToPayload() (*payload.JobResponse, error) {
 		Status:   payload.JobStatusEnum(j.Status),
 		ExitCode: j.ExitCode,
 		JobDetailMetadata: payload.JobDetailMetadata{
-			ID:       j.ID,
-			JobName:  j.JobName,
-			Command:  cmd,
-			Metadata: meta,
+			ID:        j.ID,
+			JobName:   j.JobName,
+			Command:   cmd,
+			Metadata:  meta,
+			CreatedAt: j.CreatedAt,
+			UpdatedAt: j.UpdatedAt,
 		},
 	}, nil
+}
+
+// BulkToPayload converts the bulk of raw database model back into a bulk of JobResponse struct.
+func (j *JobModel) BulkToPayload(jm []*JobModel) (p []*payload.JobResponse, err error) {
+	if len(jm) == 0 {
+		return []*payload.JobResponse{}, nil
+	}
+
+	p = make([]*payload.JobResponse, 0, len(jm))
+	for _, v := range jm {
+		if v == nil {
+			continue
+		}
+
+		pv, err := v.ToPayload()
+		if err != nil {
+			return nil, err
+		}
+
+		p = append(p, pv)
+	}
+
+	return p, nil
 }
 
 // NewJobModel creates a database-ready JobModel from a JobResponse object.

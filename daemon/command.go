@@ -8,8 +8,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"slices"
 	"strconv"
 	"syscall"
 	"time"
@@ -145,115 +143,57 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 //
 // Check payload.JobSearchMetadata for more information.
 func (d *DaemonStruct) ListJob(jc *JobContext) error {
-	p := jc.Payload
-
-	var statusRequest payload.JobSearchMetadata
-	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
+	var req payload.JobSearchMetadata
+	if err := jc.Payload.UnmarshalMetadata(&req); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
-	files, err := os.ReadDir(d.DataDir)
+	job, err := models.NewJobModel(jc.daemon.DB, payload.JobResponse{})
 	if err != nil {
-		return &DaemonError{"Failed to read bobbit directory", err}
+		return &DaemonError{"Failed when initialize db model", err}
 	}
 
-	jobIDs := make(map[string]bool)
-	// Collect unique job IDs from the filenames
-	for _, file := range files {
-		if filestat, err := os.Stat(filepath.Join(d.DataDir, file.Name())); err != nil {
-			log.Printf("Error when checking status of file: %v", err)
-			continue
-		} else {
-			if filestat.IsDir() {
-				continue
-			}
-		}
-
-		jobfile := SplitFilenameFromExtfile(file.Name())
-		jobIDs[jobfile] = true
+	filter := &models.JobFilter{
+		ActiveOnly: req.ActiveOnly,
+		FinishOnly: req.FinishOnly,
+		DBGetFilter: models.DBGetFilter{
+			Limit:    req.Limit,
+			ID:       req.Search,
+			Keyword:  req.Search,
+			SortDesc: req.OrderDesc,
+		},
 	}
 
-	// Convert map keys to slice and sort
-	jobIDSlice := make([]string, 0, len(jobIDs))
-	for k := range jobIDs {
-		jobIDSlice = append(jobIDSlice, k)
-		delete(jobIDs, k)
-	}
-	slices.Sort(jobIDSlice)
-	// Reverse order if requested
-	if statusRequest.OrderDesc {
-		slices.Reverse(jobIDSlice)
+	// Enable pagination if Page and Limit called
+	if req.Page > 0 && req.Limit > 0 {
+		filter.Offset = (req.Page - 1) * req.Limit
 	}
 
-	// Apply pagination (limit and page) if specified
-	if statusRequest.Limit > 0 {
-		start := 0
-		end := statusRequest.Limit
-
-		if statusRequest.Page > 0 {
-			start = (statusRequest.Page - 1) * statusRequest.Limit
-			end = start + statusRequest.Limit
-		}
-
-		if start >= len(jobIDSlice) {
-			jobIDSlice = []string{}
-		} else {
-			end = min(end, len(jobIDSlice))
-			jobIDSlice = jobIDSlice[start:end]
-		}
-	}
-
-	allJobs := []payload.JobResponse{}
-	// Iterate through selected job IDs to gather full job details
-	for _, id := range jobIDSlice {
-		// Skip if both finish-only and active-only filters are set (mutually exclusive)
-		if statusRequest.FinishOnly && statusRequest.ActiveOnly {
-			continue
-		}
-
-		metadata, err := ParseJobDataFilename(id)
+	// If user only needs to return number
+	if req.NumberOnly {
+		jobCount, err := job.Count(filter)
 		if err != nil {
-			log.Println(err)
-			continue
-		}
-		status := payload.JobResponse{JobDetailMetadata: metadata}
-		if err := ParseExitCode(d.BobbitConfig, &status); err != nil {
-			log.Printf("Failed to parse exit code from %s job: %v\n", id, err)
-			continue
+			return &DaemonError{"Failed when counting the job", err}
 		}
 
-		if statusRequest.RequestMeta {
-			if metaBytes, err := os.ReadFile(GenerateJobDataFilename(d.BobbitConfig, metadata, DAEMON_METADATA)); err == nil {
-				err := json.Unmarshal(metaBytes, &status.Metadata)
-				if err != nil {
-					log.Printf("Failed to unmarshal metadata from %s job: %v\n", id, err)
-					continue
-				}
-			}
+		if err := jc.SendPayload(payload.JobResponseCount{Count: jobCount}); err != nil {
+			return &DaemonError{"Invalid metadata: Failed to send payload", err}
 		}
 
-		if statusRequest.FinishOnly && status.Status == payload.JOB_RUNNING {
-			continue
-		}
-
-		if statusRequest.ActiveOnly && status.Status != payload.JOB_RUNNING {
-			continue
-		}
-
-		allJobs = append(allJobs, status)
+		return nil
 	}
 
-	// Send back job count or full job details based on request
-	if statusRequest.NumberOnly {
-		jobs := len(allJobs)
-		allJobs = nil
-		if err := jc.SendPayload(payload.JobResponseCount{Count: jobs}); err != nil {
-			return &DaemonError{"Invalid metadata: Failed to send payload", err}
-		}
-	} else {
-		if err := jc.SendPayload(allJobs); err != nil {
-			return &DaemonError{"Invalid metadata: Failed to send payload", err}
-		}
+	rawJobs, err := job.Get(filter)
+	if err != nil {
+		return &DaemonError{"Failed when fetch the job", err}
+	}
+	jobs, err := job.BulkToPayload(rawJobs)
+	if err != nil {
+		return &DaemonError{"Failed when transforming raw job", err}
+	}
+
+	if err := jc.SendPayload(jobs); err != nil {
+		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 
 	return nil
