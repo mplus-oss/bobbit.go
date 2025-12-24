@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -92,6 +94,44 @@ func (j *JobModel) Get(filter *JobFilter) ([]*JobModel, error) {
 	}
 
 	return jobs, nil
+}
+
+// WaitJob will waiting the filter until it finished.
+func (j *JobModel) WaitJob(ctx context.Context, cancel context.CancelFunc, filter *JobFilter) (*JobModel, error) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	var finalJob *JobModel
+	var finalErr error
+
+	for {
+		select {
+		case <-ctx.Done():
+			return finalJob, finalErr
+
+		case <-ticker.C:
+			query := "SELECT * FROM jobs"
+			args := []any{}
+			filter.Limit = 1
+			query, args = j.applyCriteria(query, args, filter)
+
+			var p JobModel
+			if err := j.DB.GetContext(ctx, &p, query, args...); err != nil {
+				if err == sql.ErrNoRows {
+					continue
+				}
+
+				finalErr = err
+				cancel()
+				continue
+			}
+
+			if p.Status != int(payload.JOB_RUNNING) {
+				finalJob = &p
+				cancel()
+			}
+		}
+	}
 }
 
 // Get fetch the job data from the table and return it as a int of JobModel size.
