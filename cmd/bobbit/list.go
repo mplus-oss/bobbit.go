@@ -89,7 +89,7 @@ func RegisterListCommand() {
 			}
 
 			w := tabwriter.NewWriter(os.Stderr, 0, 0, 3, ' ', 0)
-			fmt.Fprintln(w, "Time\tID\tName\tStatus\tExit Code")
+			fmt.Fprintln(w, "Start\tUpdate\tID (Short)\tName\tStatus\tExit Code")
 			for _, job := range jobs {
 				var status string
 				switch job.Status {
@@ -102,9 +102,10 @@ func RegisterListCommand() {
 				}
 
 				fmt.Fprintf(
-					w, "%v\t%s\t%s\t%s\t%d\n",
-					job.Timestamp.Format(time.RFC3339),
-					job.ID,
+					w, "%v\t%v\t%s\t%s\t%s\t%d\n",
+					job.CreatedAt.Format(time.RFC3339),
+					job.UpdatedAt.Format(time.RFC3339),
+					job.ID[:16],
 					job.JobName,
 					status,
 					job.ExitCode,
