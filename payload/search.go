@@ -33,4 +33,8 @@ type JobSearchMetadata struct {
 
 	// When true, orders the results in descending order.
 	OrderDesc bool `json:"desc,omitempty"`
+
+	// MetadataFilter allows filtering jobs based on their metadata.
+	// It's a map where keys are metadata field names and values are the desired values.
+	MetadataFilter map[string]string `json:"metadata_filter,omitempty"`
 }

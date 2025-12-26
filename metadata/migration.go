@@ -13,6 +13,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mplus-oss/bobbit.go/config"
+	"github.com/mplus-oss/bobbit.go/internal/dblib"
 )
 
 //go:embed migrations/*.sql
@@ -36,6 +37,11 @@ func InitDB(cfg config.BobbitDaemonConfig) (*sqlx.DB, error) {
 	err = runMigration(db)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to migrate: %w", err)
+	}
+
+	// Check SQLite version for JSON function support
+	if _, err := dblib.CheckSQLiteJSONFunctions(db); err != nil {
+		log.Printf("[WARNING] Failed to check SQLite JSON function support: %v", err)
 	}
 
 	return db, nil
