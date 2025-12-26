@@ -23,4 +23,8 @@ type JobDetailMetadata struct {
 
 	// UpdatedAt indicates every single changes job status.
 	UpdatedAt time.Time `json:"updated_at"`
+
+	// MetadataFilter allows filtering jobs based on their metadata.
+	// It's a map where keys are metadata field names and values are the desired values.
+	MetadataFilter map[string]string `json:"metadata_filter,omitempty"`
 }
