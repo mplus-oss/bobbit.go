@@ -12,11 +12,6 @@ type JobDetailMetadata struct {
 	// JobName is the name given to the job.
 	JobName string `json:"job_name"`
 
-	// Deprecated: See CreatedAt and UpdatedAt
-	//
-	// Timestamp indicates when the job was recorded.
-	Timestamp time.Time `json:"timestamp"`
-
 	// Command specifies the command-line arguments used to execute the job. Required for creating new job.
 	Command []string `json:"command,omitempty"`
 
