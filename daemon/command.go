@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strconv"
 	"syscall"
 
 	"github.com/mplus-oss/bobbit.go/internal/lib"
@@ -117,6 +116,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	}
 
 	job.Status = int(payload.JOB_RUNNING)
+	job.PID = cmd.Process.Pid
 	if err := job.Update(); err != nil {
 		log.Printf("[WARNING] Failed when updating status: %+v", err)
 	}
@@ -299,45 +299,47 @@ func (d *DaemonStruct) StatusJob(jc *JobContext) error {
 // StopJob handles requests to stop the specific job.
 // If the job exist, the return is JobResponse. If the job not exist, the return is an empty JobResponse.
 func (d *DaemonStruct) StopJob(jc *JobContext) error {
-	p := jc.Payload
-
-	var statusRequest payload.JobSearchMetadata
-	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
+	var req payload.JobSearchMetadata
+	if err := jc.Payload.UnmarshalMetadata(&req); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
-	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
+	jobModel, err := models.NewJobModel(jc.daemon.DB, payload.JobResponse{})
 	if err != nil {
-		return &DaemonError{"Failed to find job data", err}
+		return &DaemonError{"Failed when initialize db model", err}
 	}
 
-	resp := payload.JobResponse{JobDetailMetadata: job}
-	if err := ParseExitCode(d.BobbitConfig, &resp); err != nil {
-		return &DaemonError{"Failed to parse exitcode", err}
+	filter := &models.JobFilter{
+		DBGetFilter: models.DBGetFilter{
+			ID:       req.Search,
+			Keyword:  req.Search,
+			Limit:    1,
+			SortDesc: true,
+		},
 	}
-
-	// Send empty response
-	if resp.Status != payload.JOB_RUNNING {
-		if err := jc.SendPayload(payload.JobResponse{}); err != nil {
-			return &DaemonError{"Invalid metadata: Failed to send payload", err}
-		}
-		return nil
-	}
-
-	pidBytes, err := os.ReadFile(GenerateJobDataFilename(d.BobbitConfig, job, DAEMON_LOCKFILE))
+	jobs, err := jobModel.Get(filter)
 	if err != nil {
-		return err
+		return &DaemonError{"Failed when finding job", err}
 	}
-	pid, err := strconv.Atoi(string(pidBytes))
-	if err != nil {
-		return err
+	if sizeJob := len(jobs); sizeJob < 1 {
+		return &DaemonError{"Job not found", fmt.Errorf("len: %v", sizeJob)}
 	}
 
-	if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
+	job := jobs[0]
+	if err := syscall.Kill(-job.PID, syscall.SIGTERM); err != nil {
 		return err
 	}
 
-	if err := jc.SendPayload(resp); err != nil {
+	job.Status = int(payload.JOB_STOPPED)
+	if err := job.Update(); err != nil {
+		log.Printf("[WARNING] Failed when updating status: %+v", err)
+	}
+
+	jobPayload, err := job.ToPayload()
+	if err != nil {
+		return &DaemonError{"Failed when parsing the payload", err}
+	}
+	if err := jc.SendPayload(jobPayload); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 
