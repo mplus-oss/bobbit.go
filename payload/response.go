@@ -12,6 +12,8 @@ const (
 	JOB_FAILED
 	// JOB_NOT_RUNNING indicates that the job is not currently running.
 	JOB_NOT_RUNNING
+	// JOB_STOPPED indicates that the job is stopped.
+	JOB_STOPPED
 )
 
 // JobResponse represents the detailed response for a job query.
@@ -33,4 +35,22 @@ type JobResponseCount struct {
 
 	// Count is the total number of jobs matching the criteria.
 	Count int `json:"count"`
+}
+
+func ParseJobStatus(jobStatus JobStatusEnum) (status string) {
+	switch jobStatus {
+	case JOB_FAILED:
+		status = "Failed"
+	case JOB_FINISH:
+		status = "Finished"
+	case JOB_NOT_RUNNING:
+		status = "Not running"
+	case JOB_RUNNING:
+		status = "Running"
+	case JOB_STOPPED:
+		status = "Stopped"
+	default:
+		status = "Unknown"
+	}
+	return status
 }

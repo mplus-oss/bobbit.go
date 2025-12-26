@@ -24,6 +24,27 @@ const (
 	REQUEST_STOP
 )
 
+// ParsePayloadRequest return humanize value of PayloadRequestEnum
+func ParsePayloadRequest(payloadReq PayloadRequestEnum) (status string) {
+	switch payloadReq {
+	case REQUEST_EXECUTE_JOB:
+		status = "EXECUTE"
+	case REQUEST_LIST:
+		status = "LIST"
+	case REQUEST_WAIT:
+		status = "WAIT"
+	case REQUEST_STATUS:
+		status = "STATUS"
+	case REQUEST_VIBE_CHECK:
+		status = "VIBE_CHECK"
+	case REQUEST_STOP:
+		status = "STOP"
+	default:
+		status = "UNKNOWN"
+	}
+	return status
+}
+
 // PayloadRegularMetadata is a type alias for any, used to hold arbitrary metadata
 // associated with a job request. This allows for flexible and extensible payload structures.
 type PayloadRegularMetadata any

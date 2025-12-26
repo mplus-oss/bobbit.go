@@ -12,13 +12,13 @@ import (
 // DaemonConnectionStruct holds the network connection and configuration for a Bobbit daemon client.
 type DaemonConnectionStruct struct {
 	Connection net.Conn
-	config.BobbitConfig
+	config.BobbitClientConfig
 }
 
 // New creates and returns a new DaemonConnectionStruct initialized with the provided BobbitConfig.
-func New(c config.BobbitConfig) *DaemonConnectionStruct {
+func New(c config.BobbitClientConfig) *DaemonConnectionStruct {
 	return &DaemonConnectionStruct{
-		BobbitConfig: c,
+		BobbitClientConfig: c,
 	}
 }
 

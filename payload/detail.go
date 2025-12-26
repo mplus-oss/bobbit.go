@@ -12,7 +12,9 @@ type JobDetailMetadata struct {
 	// JobName is the name given to the job.
 	JobName string `json:"job_name"`
 
-	// Timestamp indicates when the job was recorded or last updated.
+	// Deprecated: See CreatedAt and UpdatedAt
+	//
+	// Timestamp indicates when the job was recorded.
 	Timestamp time.Time `json:"timestamp"`
 
 	// Command specifies the command-line arguments used to execute the job. Required for creating new job.
@@ -20,4 +22,10 @@ type JobDetailMetadata struct {
 
 	// Metadata contains additional regular payload metadata associated with the job.
 	Metadata PayloadRegularMetadata `json:"metadata,omitempty"`
+
+	// CreatedAt indicates when the job was recorded first time.
+	CreatedAt time.Time `json:"created_at"`
+
+	// UpdatedAt indicates every single changes job status.
+	UpdatedAt time.Time `json:"updated_at"`
 }

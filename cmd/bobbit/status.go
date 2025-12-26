@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/mplus-oss/bobbit.go/internal/lib"
 	"github.com/mplus-oss/bobbit.go/internal/shell"
 	"github.com/mplus-oss/bobbit.go/payload"
 	"github.com/spf13/cobra"
@@ -36,26 +38,32 @@ func RegisterStatusCommand() {
 				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
 			}
 
-			var status string
-			switch job.Status {
-			case payload.JOB_FAILED:
-				status = "Failed"
-			case payload.JOB_FINISH:
-				status = "Finished"
-			case payload.JOB_NOT_RUNNING:
-				status = "Not running"
-			case payload.JOB_RUNNING:
-				status = "Running"
-			default:
-				status = "Unknown"
+			var duration string
+			timeStr := "%s [%s - %s]"
+			now := time.Now()
+			if job.Status == payload.JOB_RUNNING {
+				duration = lib.HumanizeDuration(now.Sub(job.CreatedAt))
+				timeStr = fmt.Sprintf(
+					timeStr, "elapsed "+duration,
+					job.CreatedAt.Local().String(),
+					now.Local().String(),
+				)
+			} else {
+				duration = lib.HumanizeDuration(job.UpdatedAt.Sub(job.CreatedAt))
+				timeStr = fmt.Sprintf(
+					timeStr, duration,
+					job.CreatedAt.Local().String(),
+					job.UpdatedAt.Local().String(),
+				)
 			}
 
 			shell.Printf("Status for Job: %s\n", job.JobName)
 			shell.Printf("------------------------\n")
 			shell.Printf("  ID:        %s\n", job.ID)
-			shell.Printf("  Status:    %s\n", status)
+			shell.Printf("  Status:    %s\n", payload.ParseJobStatus(job.Status))
 			shell.Printf("  Exit Code: %d\n", job.ExitCode)
-			shell.Printf("  Timestamp: %s\n", job.Timestamp.Format(time.RFC3339))
+			shell.Printf("  Time:      %s\n", timeStr)
+
 			if showMetadata && job.Metadata != nil {
 				metaBytes, err := json.MarshalIndent(job.Metadata, "", "  ")
 				if err == nil {

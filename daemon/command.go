@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,13 +9,10 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"slices"
-	"strconv"
 	"syscall"
-	"time"
 
 	"github.com/mplus-oss/bobbit.go/internal/lib"
+	"github.com/mplus-oss/bobbit.go/metadata/models"
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
@@ -34,65 +32,69 @@ func (d *DaemonStruct) HandleVibeCheck(jc *JobContext) error {
 // generates a unique ID if not provided, creates necessary data files (lock, log, metadata),
 // executes the command, captures its output and exit code, and cleans up the lock file.
 func (d *DaemonStruct) HandleJob(jc *JobContext) error {
-	var payload payload.JobDetailMetadata
-	if err := jc.Payload.UnmarshalMetadata(&payload); err != nil {
+	var p payload.JobDetailMetadata
+	if err := jc.Payload.UnmarshalMetadata(&p); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
-	if payload.JobName == "" || len(payload.Command) < 1 {
-		return &DaemonError{"Invalid payload: JobName or Command not provided", nil}
+	if p.JobName == "" || len(p.Command) < 1 {
+		return &DaemonError{"Invalid p: JobName or Command not provided", nil}
 	}
+
 	// Generate a unique ID if not provided
-	if payload.ID == "" {
-		hash, err := lib.GenerateRandomHash(16)
+	if p.ID == "" {
+		hash, err := lib.GenerateRandomHash(32)
 		if err != nil {
 			return &DaemonError{"Failed to create Hash for job", err}
 		}
-		payload.ID = hash
-	}
-	// Set timestamp if not provided
-	if payload.Timestamp.IsZero() {
-		payload.Timestamp = jc.Payload.Timestamp
+		p.ID = hash
 	}
 
-	// Generate file paths for job-related data
-	lockFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_LOCKFILE)
-	logFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_LOGFILE)
-	exitCodeFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_EXITCODE)
-	metadataFile := GenerateJobDataFilename(d.BobbitConfig, payload, DAEMON_METADATA)
-
-	if err := os.WriteFile(lockFile, []byte{}, 0644); err != nil {
-		return &DaemonPayloadError{"Failed to create lockfile", payload.ID, err}
+	// Set timestamp if not provided. This is for logfile path.
+	if p.CreatedAt.IsZero() {
+		p.CreatedAt = jc.Payload.Timestamp
+		p.UpdatedAt = jc.Payload.Timestamp
 	}
-	defer os.Remove(lockFile)
 
+	// Marshal and write job metadata
 	metadataStr := ""
-	// Marshal and write job metadata to a file
-	if payload.Metadata != nil {
-		metaByte, err := json.Marshal(payload.Metadata)
+	if p.Metadata != nil {
+		metaByte, err := json.Marshal(p.Metadata)
 		if err != nil {
-			return &DaemonPayloadError{"Failed to marshal metadata", payload.ID, err}
-		}
-
-		if err := os.WriteFile(metadataFile, metaByte, 0644); err != nil {
-			return &DaemonPayloadError{"Failed to create metadata file", payload.ID, err}
+			return &DaemonPayloadError{"Failed to marshal metadata", p.ID, err}
 		}
 
 		metadataStr = string(metaByte)
 	}
 
+	// Prepare the logfile
+	logFile := GenerateJobLogPath(jc.daemon.BobbitDaemonConfig, p)
 	logOutput, err := os.Create(logFile)
 	if err != nil {
-		return &DaemonPayloadError{"Failed to create logfile", payload.ID, err}
+		return &DaemonPayloadError{"Failed to create logfile", p.ID, err}
 	}
 	defer logOutput.Close()
 
-	exitCode := 0
-	if len(payload.Command) == 0 {
-		return &DaemonPayloadError{"No command provided", payload.ID, err}
+	if len(p.Command) == 0 {
+		return &DaemonPayloadError{"No command provided", p.ID, err}
 	}
 
-	cmd := exec.Command(payload.Command[0], payload.Command[1:]...)
+	// Save the process
+	respPayload := payload.JobResponse{
+		ExitCode:          -1,
+		Status:            payload.JOB_NOT_RUNNING,
+		JobDetailMetadata: p,
+	}
+	job, err := models.NewJobModel(jc.daemon.DB, respPayload)
+	if err != nil {
+		return &DaemonPayloadError{"Failed when initialize db model", p.ID, err}
+	}
+	if err := job.Save(); err != nil {
+		return &DaemonPayloadError{"Failed when creating job record", p.ID, err}
+	}
+
+	// Prep the output
+	cmd := exec.Command(p.Command[0], p.Command[1:]...)
 	cmd.Stdout = logOutput
 	cmd.Stderr = logOutput
 
@@ -102,34 +104,41 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	// Add job-specific environment variables
 	cmd.Env = append(
 		os.Environ(),
-		fmt.Sprintf("JOB_ID=%s", payload.ID),
-		fmt.Sprintf("JOB_NAME=%s", payload.JobName),
+		fmt.Sprintf("JOB_ID=%s", p.ID),
+		fmt.Sprintf("JOB_NAME=%s", p.JobName),
 		fmt.Sprintf("JOB_METADATA=%s", metadataStr),
 	)
 
+	log.Printf("Starting Job: %+v", p)
 	if err := cmd.Start(); err != nil {
-		return &DaemonPayloadError{"Failed when starting command", payload.ID, err}
+		job.Delete()
+		return &DaemonPayloadError{"Failed when starting command", p.ID, err}
 	}
 
-	if err := os.WriteFile(lockFile, fmt.Appendf([]byte{}, "%d", cmd.Process.Pid), 0644); err != nil {
-		return err
+	job.Status = int(payload.JOB_RUNNING)
+	job.PID = cmd.Process.Pid
+	if err := job.Update(); err != nil {
+		log.Printf("[WARNING] Failed when updating status: %+v", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
+			job.ExitCode = exitErr.ExitCode()
 		} else {
-			exitCode = 127
+			job.ExitCode = 127
 		}
-
-		if exitCode > 0 {
-			return &DaemonPayloadError{"Exit with code", payload.ID, fmt.Errorf("code: %d", exitCode)}
-		}
+	} else {
+		job.ExitCode = 0
 	}
 
-	if err := os.WriteFile(exitCodeFile, fmt.Appendf([]byte{}, "%d", exitCode), 0644); err != nil {
-		(&DaemonPayloadError{"Failed to create exitcode file. Please handle it manually.", payload.ID, err}).Warning()
+	if err := job.MarkJobFinished(); err != nil {
+		return &DaemonPayloadError{"Failed to update job", p.ID, err}
 	}
+
+	if job.ExitCode > 0 {
+		return &DaemonPayloadError{"Exit with code", p.ID, fmt.Errorf("code: %d", job.ExitCode)}
+	}
+
 	return nil
 }
 
@@ -139,115 +148,57 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 //
 // Check payload.JobSearchMetadata for more information.
 func (d *DaemonStruct) ListJob(jc *JobContext) error {
-	p := jc.Payload
-
-	var statusRequest payload.JobSearchMetadata
-	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
+	var req payload.JobSearchMetadata
+	if err := jc.Payload.UnmarshalMetadata(&req); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
-	files, err := os.ReadDir(d.DataDir)
+	job, err := models.NewJobModel(jc.daemon.DB, payload.JobResponse{})
 	if err != nil {
-		return &DaemonError{"Failed to read bobbit directory", err}
+		return &DaemonError{"Failed when initialize db model", err}
 	}
 
-	jobIDs := make(map[string]bool)
-	// Collect unique job IDs from the filenames
-	for _, file := range files {
-		if filestat, err := os.Stat(filepath.Join(d.DataDir, file.Name())); err != nil {
-			log.Printf("Error when checking status of file: %v", err)
-			continue
-		} else {
-			if filestat.IsDir() {
-				continue
-			}
-		}
-
-		jobfile := SplitFilenameFromExtfile(file.Name())
-		jobIDs[jobfile] = true
+	filter := &models.JobFilter{
+		ActiveOnly: req.ActiveOnly,
+		FinishOnly: req.FinishOnly,
+		DBGetFilter: models.DBGetFilter{
+			Limit:    req.Limit,
+			ID:       req.Search,
+			Keyword:  req.Search,
+			SortDesc: req.OrderDesc,
+		},
 	}
 
-	// Convert map keys to slice and sort
-	jobIDSlice := make([]string, 0, len(jobIDs))
-	for k := range jobIDs {
-		jobIDSlice = append(jobIDSlice, k)
-		delete(jobIDs, k)
-	}
-	slices.Sort(jobIDSlice)
-	// Reverse order if requested
-	if statusRequest.OrderDesc {
-		slices.Reverse(jobIDSlice)
+	// Enable pagination if Page and Limit called
+	if req.Page > 0 && req.Limit > 0 {
+		filter.Offset = (req.Page - 1) * req.Limit
 	}
 
-	// Apply pagination (limit and page) if specified
-	if statusRequest.Limit > 0 {
-		start := 0
-		end := statusRequest.Limit
-
-		if statusRequest.Page > 0 {
-			start = (statusRequest.Page - 1) * statusRequest.Limit
-			end = start + statusRequest.Limit
-		}
-
-		if start >= len(jobIDSlice) {
-			jobIDSlice = []string{}
-		} else {
-			end = min(end, len(jobIDSlice))
-			jobIDSlice = jobIDSlice[start:end]
-		}
-	}
-
-	allJobs := []payload.JobResponse{}
-	// Iterate through selected job IDs to gather full job details
-	for _, id := range jobIDSlice {
-		// Skip if both finish-only and active-only filters are set (mutually exclusive)
-		if statusRequest.FinishOnly && statusRequest.ActiveOnly {
-			continue
-		}
-
-		metadata, err := ParseJobDataFilename(id)
+	// If user only needs to return number
+	if req.NumberOnly {
+		jobCount, err := job.Count(filter)
 		if err != nil {
-			log.Println(err)
-			continue
-		}
-		status := payload.JobResponse{JobDetailMetadata: metadata}
-		if err := ParseExitCode(d.BobbitConfig, &status); err != nil {
-			log.Printf("Failed to parse exit code from %s job: %v\n", id, err)
-			continue
+			return &DaemonError{"Failed when counting the job", err}
 		}
 
-		if statusRequest.RequestMeta {
-			if metaBytes, err := os.ReadFile(GenerateJobDataFilename(d.BobbitConfig, metadata, DAEMON_METADATA)); err == nil {
-				err := json.Unmarshal(metaBytes, &status.Metadata)
-				if err != nil {
-					log.Printf("Failed to unmarshal metadata from %s job: %v\n", id, err)
-					continue
-				}
-			}
+		if err := jc.SendPayload(payload.JobResponseCount{Count: jobCount}); err != nil {
+			return &DaemonError{"Invalid metadata: Failed to send payload", err}
 		}
 
-		if statusRequest.FinishOnly && status.Status == payload.JOB_RUNNING {
-			continue
-		}
-
-		if statusRequest.ActiveOnly && status.Status != payload.JOB_RUNNING {
-			continue
-		}
-
-		allJobs = append(allJobs, status)
+		return nil
 	}
 
-	// Send back job count or full job details based on request
-	if statusRequest.NumberOnly {
-		jobs := len(allJobs)
-		allJobs = nil
-		if err := jc.SendPayload(payload.JobResponseCount{Count: jobs}); err != nil {
-			return &DaemonError{"Invalid metadata: Failed to send payload", err}
-		}
-	} else {
-		if err := jc.SendPayload(allJobs); err != nil {
-			return &DaemonError{"Invalid metadata: Failed to send payload", err}
-		}
+	rawJobs, err := job.Get(filter)
+	if err != nil {
+		return &DaemonError{"Failed when fetch the job", err}
+	}
+	jobs, err := job.BulkToPayload(rawJobs)
+	if err != nil {
+		return &DaemonError{"Failed when transforming raw job", err}
+	}
+
+	if err := jc.SendPayload(jobs); err != nil {
+		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 
 	return nil
@@ -258,58 +209,38 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 // responds to the client with the job's final status once completed.
 // It also handles client connection timeouts.
 func (d *DaemonStruct) WaitJob(jc *JobContext) error {
-	p := jc.Payload
-
-	var statusRequest payload.JobSearchMetadata
-	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
+	var req payload.JobSearchMetadata
+	if err := jc.Payload.UnmarshalMetadata(&req); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
-	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
+	jobModel, err := models.NewJobModel(jc.daemon.DB, payload.JobResponse{})
 	if err != nil {
-		return &DaemonError{"Failed to find job data", err}
+		return &DaemonError{"Failed when initialize db model", err}
 	}
 
-	// If job ID is empty, the job was not found, send a "not running" status
-	if job.ID == "" {
-		if err := jc.SendPayload(payload.JobResponse{Status: payload.JOB_NOT_RUNNING}); err != nil {
-			return &DaemonError{"Invalid metadata: Failed to send payload", err}
-		}
+	filter := &models.JobFilter{
+		ActiveOnly: true,
+		DBGetFilter: models.DBGetFilter{
+			ID:       req.Search,
+			Keyword:  req.Search,
+			Limit:    1,
+			SortDesc: true,
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	rawJob, err := jobModel.WaitJob(ctx, cancel, filter)
+	if err != nil {
+		return &DaemonError{"Failed when waiting the job", err}
+	}
+	job, err := rawJob.ToPayload()
+	if err != nil {
+		return &DaemonError{"Failed when transforming job", err}
 	}
 
-	lockFile := GenerateJobDataFilename(d.BobbitConfig, job, DAEMON_LOCKFILE)
-	for {
-		// Set a short read deadline to check for client disconnection without blocking indefinitely
-		oneByte := make([]byte, 1)
-		jc.conn.SetReadDeadline(time.Now().Add(1 * time.Millisecond))
-		if _, err := jc.conn.Read(oneByte); err != io.EOF {
-			// If error is not EOF and not a timeout, it means connection issue, return error
-			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
-				log.Printf("Connection closed from client. job=%v\n", job)
-				return err
-			}
-		} else {
-			// If EOF is returned, the client has closed the connection
-			return &DaemonError{"Connection Error", err}
-		}
-		jc.conn.SetReadDeadline(time.Time{})
-
-		// Check if the lock file exists; if not, the job has completed
-		if _, err := os.Stat(lockFile); os.IsNotExist(err) {
-			break
-		}
-		// Wait before polling again to avoid busy-waiting
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	resp := payload.JobResponse{JobDetailMetadata: job}
-	if err := ParseExitCode(d.BobbitConfig, &resp); err != nil {
-		return &DaemonPayloadError{"Failed to parse exit code", job.JobName, err}
-	}
-	if err := jc.SendPayload(resp); err != nil {
+	if err := jc.SendPayload(job); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
-	log.Printf("Job waiting finish: %v\n", job)
 
 	// Send FIN/Half-Close Connection
 	if unixConn, ok := jc.conn.(*net.UnixConn); ok {
@@ -327,29 +258,38 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 // It finds the job based on the provided search metadata, parses its exit code
 // to determine its status, and sends the `JobResponse` back to the client.
 func (d *DaemonStruct) StatusJob(jc *JobContext) error {
-	p := jc.Payload
-
-	var statusRequest payload.JobSearchMetadata
-	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
+	var req payload.JobSearchMetadata
+	if err := jc.Payload.UnmarshalMetadata(&req); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
-	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
+	jobModel, err := models.NewJobModel(jc.daemon.DB, payload.JobResponse{})
 	if err != nil {
-		return &DaemonError{"Failed to find job data", err}
+		return &DaemonError{"Failed when initialize db model", err}
 	}
 
-	if job.ID == "" {
-		if err := jc.SendPayload(payload.JobResponse{Status: payload.JOB_NOT_RUNNING}); err != nil {
-			return &DaemonError{"Invalid metadata: Failed to send payload", err}
-		}
+	filter := &models.JobFilter{
+		DBGetFilter: models.DBGetFilter{
+			ID:       req.Search,
+			Keyword:  req.Search,
+			Limit:    1,
+			SortDesc: true,
+		},
+	}
+	jobs, err := jobModel.Get(filter)
+	if err != nil {
+		return &DaemonError{"Failed when finding job", err}
+	}
+	if sizeJob := len(jobs); sizeJob < 1 {
+		return &DaemonError{"Job not found", fmt.Errorf("len: %v", sizeJob)}
 	}
 
-	finalStatus := payload.JobResponse{JobDetailMetadata: job}
-	if err := ParseExitCode(d.BobbitConfig, &finalStatus); err != nil {
-		return &DaemonPayloadError{"Failed to parse exit code", job.JobName, err}
+	jobResp, err := jobs[0].ToPayload()
+	if err != nil {
+		return &DaemonError{"Failed when parsing the payload", err}
 	}
-	if err := jc.SendPayload(finalStatus); err != nil {
+
+	if err := jc.SendPayload(jobResp); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 
@@ -359,45 +299,47 @@ func (d *DaemonStruct) StatusJob(jc *JobContext) error {
 // StopJob handles requests to stop the specific job.
 // If the job exist, the return is JobResponse. If the job not exist, the return is an empty JobResponse.
 func (d *DaemonStruct) StopJob(jc *JobContext) error {
-	p := jc.Payload
-
-	var statusRequest payload.JobSearchMetadata
-	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
+	var req payload.JobSearchMetadata
+	if err := jc.Payload.UnmarshalMetadata(&req); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
-	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
+	jobModel, err := models.NewJobModel(jc.daemon.DB, payload.JobResponse{})
 	if err != nil {
-		return &DaemonError{"Failed to find job data", err}
+		return &DaemonError{"Failed when initialize db model", err}
 	}
 
-	resp := payload.JobResponse{JobDetailMetadata: job}
-	if err := ParseExitCode(d.BobbitConfig, &resp); err != nil {
-		return &DaemonError{"Failed to parse exitcode", err}
+	filter := &models.JobFilter{
+		DBGetFilter: models.DBGetFilter{
+			ID:       req.Search,
+			Keyword:  req.Search,
+			Limit:    1,
+			SortDesc: true,
+		},
 	}
-
-	// Send empty response
-	if resp.Status != payload.JOB_RUNNING {
-		if err := jc.SendPayload(payload.JobResponse{}); err != nil {
-			return &DaemonError{"Invalid metadata: Failed to send payload", err}
-		}
-		return nil
-	}
-
-	pidBytes, err := os.ReadFile(GenerateJobDataFilename(d.BobbitConfig, job, DAEMON_LOCKFILE))
+	jobs, err := jobModel.Get(filter)
 	if err != nil {
-		return err
+		return &DaemonError{"Failed when finding job", err}
 	}
-	pid, err := strconv.Atoi(string(pidBytes))
-	if err != nil {
-		return err
+	if sizeJob := len(jobs); sizeJob < 1 {
+		return &DaemonError{"Job not found", fmt.Errorf("len: %v", sizeJob)}
 	}
 
-	if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
+	job := jobs[0]
+	if err := syscall.Kill(-job.PID, syscall.SIGTERM); err != nil {
 		return err
 	}
 
-	if err := jc.SendPayload(resp); err != nil {
+	job.Status = int(payload.JOB_STOPPED)
+	if err := job.Update(); err != nil {
+		log.Printf("[WARNING] Failed when updating status: %+v", err)
+	}
+
+	jobPayload, err := job.ToPayload()
+	if err != nil {
+		return &DaemonError{"Failed when parsing the payload", err}
+	}
+	if err := jc.SendPayload(jobPayload); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 
