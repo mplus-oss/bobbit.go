@@ -12,6 +12,8 @@ const (
 	JOB_FAILED
 	// JOB_NOT_RUNNING indicates that the job is not currently running.
 	JOB_NOT_RUNNING
+	// JOB_STOPPED indicates that the job is stopped.
+	JOB_STOPPED
 )
 
 // JobResponse represents the detailed response for a job query.
@@ -45,6 +47,8 @@ func ParseJobStatus(jobStatus JobStatusEnum) (status string) {
 		status = "Not running"
 	case JOB_RUNNING:
 		status = "Running"
+	case JOB_STOPPED:
+		status = "Stopped"
 	default:
 		status = "Unknown"
 	}
