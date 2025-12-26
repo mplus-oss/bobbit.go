@@ -159,8 +159,9 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	}
 
 	filter := &models.JobFilter{
-		ActiveOnly: req.ActiveOnly,
-		FinishOnly: req.FinishOnly,
+		ActiveOnly:     req.ActiveOnly,
+		FinishOnly:     req.FinishOnly,
+		MetadataFilter: req.MetadataFilter,
 		DBGetFilter: models.DBGetFilter{
 			Limit:    req.Limit,
 			ID:       req.Search,

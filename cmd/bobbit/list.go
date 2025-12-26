@@ -45,16 +45,21 @@ func RegisterListCommand() {
 			if err != nil {
 				shell.Fatalfln(3, "%v", err)
 			}
+			metadataFilter, err := cmd.Flags().GetStringToString("metadata")
+			if err != nil {
+				shell.Fatalfln(3, "%v", err)
+			}
 
 			p := payload.JobPayload{Request: payload.REQUEST_LIST}
 			req := payload.JobSearchMetadata{
-				RequestMeta: false,
-				ActiveOnly:  activeOnly,
-				Limit:       countMaxJob,
-				Page:        pageJob,
-				NumberOnly:  jobNumberOnly,
-				OrderDesc:   orderDesc,
-				FinishOnly:  finishOnly,
+				RequestMeta:    false,
+				ActiveOnly:     activeOnly,
+				Limit:          countMaxJob,
+				Page:           pageJob,
+				NumberOnly:     jobNumberOnly,
+				OrderDesc:      orderDesc,
+				FinishOnly:     finishOnly,
+				MetadataFilter: metadataFilter,
 			}
 			if err := cli.BuildPayload(&p, req); err != nil {
 				shell.Fatalfln(3, "Failed to build payload: %v", err)
@@ -124,6 +129,7 @@ func RegisterListCommand() {
 	list.Flags().IntP("page", "p", 0, "Create pagination of jobs based on limit option")
 	list.Flags().Bool("total", false, "Returns only the total count of jobs instead of the full list")
 	list.Flags().BoolP("to-json", "j", false, "Print the list to stringify JSON")
+	list.Flags().StringToStringP("metadata", "m", nil, "Filter jobs by metadata (e.g., -m 'key1=value1,key2=%%value2%%')")
 
 	cmd.AddCommand(list)
 }
