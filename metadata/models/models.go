@@ -3,7 +3,8 @@ package models
 import "github.com/jmoiron/sqlx"
 
 type BaseModel struct {
-	DB *sqlx.DB `db:"-"`
+	DB                    *sqlx.DB
+	SupportsJSONFunctions bool
 }
 
 // DBGetFilter defines the criteria used to query and filter job records from the database.
@@ -28,4 +29,19 @@ type DBGetFilter struct {
 	// Offset specifies the number of records to skip before starting to return results.
 	// Used in conjunction with Limit for pagination.
 	Offset int
+}
+
+// join is a helper function to join strings with a separator.
+func join(s []string, sep string) string {
+	if len(s) == 0 {
+		return ""
+	}
+	if len(s) == 1 {
+		return s[0]
+	}
+	result := s[0]
+	for i := 1; i < len(s); i++ {
+		result += sep + s[i]
+	}
+	return result
 }
