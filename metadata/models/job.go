@@ -20,7 +20,8 @@ type JobModel struct {
 	Command   string    `db:"command"` // JSON string representation of []string
 	Status    int       `db:"status"`  // Integer cast from JobStatusEnum
 	ExitCode  int       `db:"exit_code"`
-	Metadata  string    `db:"metadata"`   // JSON string representation of PayloadRegularMetadata
+	Metadata  string    `db:"metadata"` // JSON string representation of PayloadRegularMetadata
+	PID       int       `db:"pid"`
 	CreatedAt time.Time `db:"created_at"` // Generated automatically (current_timestamp)
 	UpdatedAt time.Time `db:"updated_at"` // Generated automatically (TRIGGER jobs_update_updated_at)
 	BaseModel
@@ -93,6 +94,10 @@ func (j *JobModel) Get(filter *JobFilter) ([]*JobModel, error) {
 		return nil, err
 	}
 
+	for i := range jobs {
+		jobs[i].DB = j.DB
+	}
+
 	return jobs, nil
 }
 
@@ -126,6 +131,8 @@ func (j *JobModel) WaitJob(ctx context.Context, cancel context.CancelFunc, filte
 				continue
 			}
 
+			p.DB = j.DB
+
 			if p.Status != int(payload.JOB_RUNNING) {
 				finalJob = &p
 				cancel()
@@ -150,7 +157,7 @@ func (j *JobModel) Count(filter *JobFilter) (int, error) {
 
 // Update persists the current state of the JobModel to the database.
 //
-// NOTE: Ensure that 'Command' and 'Metadata' fields (strings) are updated
+// NOTE: Ensure that 'Command', 'PID', and 'Metadata' fields (strings) are updated
 // with the latest JSON content before calling this method.
 func (j *JobModel) Update() error {
 	query := `
@@ -160,6 +167,7 @@ func (j *JobModel) Update() error {
 			command = :command,
 			status = :status,
 			exit_code = :exit_code,
+			pid = :pid,
 			metadata = :metadata
 		WHERE id = :id
 	`

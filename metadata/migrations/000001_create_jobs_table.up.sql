@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     command TEXT NOT NULL, 
     status INTEGER NOT NULL, 
     exit_code INTEGER DEFAULT 0,
+    pid INTEGER NOT NULL DEFAULT 0,
     metadata TEXT,
     created_at DATETIME NOT NULL DEFAULT current_timestamp,
     updated_at DATETIME NOT NULL DEFAULT current_timestamp
