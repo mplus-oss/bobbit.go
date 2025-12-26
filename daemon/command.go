@@ -258,29 +258,38 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 // It finds the job based on the provided search metadata, parses its exit code
 // to determine its status, and sends the `JobResponse` back to the client.
 func (d *DaemonStruct) StatusJob(jc *JobContext) error {
-	p := jc.Payload
-
-	var statusRequest payload.JobSearchMetadata
-	if err := p.UnmarshalMetadata(&statusRequest); err != nil {
+	var req payload.JobSearchMetadata
+	if err := jc.Payload.UnmarshalMetadata(&req); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
 	}
 
-	job, err := FindJobDataFilename(d.BobbitConfig, statusRequest)
+	jobModel, err := models.NewJobModel(jc.daemon.DB, payload.JobResponse{})
 	if err != nil {
-		return &DaemonError{"Failed to find job data", err}
+		return &DaemonError{"Failed when initialize db model", err}
 	}
 
-	if job.ID == "" {
-		if err := jc.SendPayload(payload.JobResponse{Status: payload.JOB_NOT_RUNNING}); err != nil {
-			return &DaemonError{"Invalid metadata: Failed to send payload", err}
-		}
+	filter := &models.JobFilter{
+		DBGetFilter: models.DBGetFilter{
+			ID:       req.Search,
+			Keyword:  req.Search,
+			Limit:    1,
+			SortDesc: true,
+		},
+	}
+	jobs, err := jobModel.Get(filter)
+	if err != nil {
+		return &DaemonError{"Failed when finding job", err}
+	}
+	if sizeJob := len(jobs); sizeJob < 1 {
+		return &DaemonError{"Job not found", fmt.Errorf("len: %v", sizeJob)}
 	}
 
-	finalStatus := payload.JobResponse{JobDetailMetadata: job}
-	if err := ParseExitCode(d.BobbitConfig, &finalStatus); err != nil {
-		return &DaemonPayloadError{"Failed to parse exit code", job.JobName, err}
+	jobResp, err := jobs[0].ToPayload()
+	if err != nil {
+		return &DaemonError{"Failed when parsing the payload", err}
 	}
-	if err := jc.SendPayload(finalStatus); err != nil {
+
+	if err := jc.SendPayload(jobResp); err != nil {
 		return &DaemonError{"Invalid metadata: Failed to send payload", err}
 	}
 

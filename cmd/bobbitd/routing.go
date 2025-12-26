@@ -51,7 +51,9 @@ func RouteHandler(d *daemon.DaemonStruct, jc *daemon.JobContext) {
 
 func RunJob(d *daemon.DaemonStruct, jc *daemon.JobContext, name string, handler daemon.HandlerFunc) error {
 	// Ignore this route from log if the app is not on DebugMode
-	const ignoredRoutes = payload.REQUEST_LIST | payload.REQUEST_VIBE_CHECK
+	const ignoredRoutes = payload.REQUEST_LIST |
+		payload.REQUEST_VIBE_CHECK |
+		payload.REQUEST_STATUS
 	shouldLog := d.DebugMode || !((ignoredRoutes & jc.Payload.Request) > 0)
 
 	// Add hash for logging
