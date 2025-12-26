@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/mplus-oss/bobbit.go/internal/dblib"
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
@@ -36,6 +37,10 @@ type JobFilter struct {
 	// Cannot be combined with ActiveOnly.
 	FinishOnly bool
 
+	// MetadataFilter allows filtering jobs based on their metadata.
+	// Keys are metadata field names, and values are the desired values.
+	MetadataFilter map[string]string
+
 	DBGetFilter
 }
 
@@ -58,10 +63,57 @@ func (j *JobModel) Delete() {
 
 // applyCriteria appends the WHERE logic to the query and returns the updated query and args.
 func (j *JobModel) applyCriteria(query string, args []any, filter *JobFilter) (string, []any) {
-	if filter.ID != "" || filter.Keyword != "" {
-		query += " WHERE id LIKE ? OR job_name LIKE ?"
-		args = append(args, filter.ID+"%")
-		args = append(args, "%"+filter.Keyword+"%")
+	whereClauses := []string{}
+	whereArgs := []any{}
+
+	if filter.ID != "" {
+		whereClauses = append(whereClauses, "id LIKE ?")
+		whereArgs = append(whereArgs, filter.ID+"%")
+	}
+	if filter.Keyword != "" {
+		whereClauses = append(whereClauses, "job_name LIKE ?")
+		whereArgs = append(whereArgs, "%"+filter.Keyword+"%")
+	}
+
+	// Filter for active jobs
+	if filter.ActiveOnly {
+		whereClauses = append(whereClauses, "status = ?")
+		whereArgs = append(whereArgs, payload.JOB_RUNNING)
+	}
+
+	// Filter for finished jobs
+	if filter.FinishOnly {
+		whereClauses = append(whereClauses, "(status = ? OR status = ?)")
+		whereArgs = append(whereArgs, payload.JOB_FINISH, payload.JOB_FAILED)
+	}
+
+	// Add metadata filtering
+	if len(filter.MetadataFilter) > 0 {
+		if j.SupportsJSONFunctions {
+			for k, v := range filter.MetadataFilter {
+				sanitizedK := dblib.SanitizeJsonKey(k) // Trying to sanitize key...
+				if sanitizedK == "" {
+					log.Printf("[WARNING] Skipping metadata filter for empty or invalid key after sanitization: original='%s'", k)
+					continue
+				}
+
+				// Using `json_extract(col, $.key)` keyword
+				whereClauses = append(whereClauses, fmt.Sprintf("json_extract(metadata, '$.%s') LIKE ?", k))
+				whereArgs = append(whereArgs, v)
+			}
+		} else {
+			for k, v := range filter.MetadataFilter {
+				// Fallback to LIKE for old SQLite version.
+				// Example: v:"test%" = %"key":"test%"%
+				whereClauses = append(whereClauses, "metadata LIKE ?")
+				whereArgs = append(whereArgs, fmt.Sprintf("%%\"%s\":\"%s\"%%", k, v))
+			}
+		}
+	}
+
+	if len(whereClauses) > 0 {
+		query += " WHERE " + join(whereClauses, " AND ")
+		args = append(args, whereArgs...)
 	}
 
 	if filter.SortDesc {
@@ -95,7 +147,7 @@ func (j *JobModel) Get(filter *JobFilter) ([]*JobModel, error) {
 	}
 
 	for i := range jobs {
-		jobs[i].DB = j.DB
+		jobs[i].BaseModel = j.BaseModel
 	}
 
 	return jobs, nil
@@ -131,8 +183,7 @@ func (j *JobModel) WaitJob(ctx context.Context, cancel context.CancelFunc, filte
 				continue
 			}
 
-			p.DB = j.DB
-
+			p.BaseModel = j.BaseModel
 			if p.Status != int(payload.JOB_RUNNING) {
 				finalJob = &p
 				cancel()
@@ -267,6 +318,12 @@ func NewJobModel(db *sqlx.DB, job payload.JobResponse) (*JobModel, error) {
 		metaString = string(metaBytes)
 	}
 
+	supportsJSON, err := dblib.CheckSQLiteJSONFunctions(db)
+	if err != nil {
+		log.Printf("[WARNING] Failed to check SQLite JSON function support: %v", err)
+		supportsJSON = false
+	}
+
 	return &JobModel{
 		ID:        job.ID,
 		JobName:   job.JobName,
@@ -274,6 +331,6 @@ func NewJobModel(db *sqlx.DB, job payload.JobResponse) (*JobModel, error) {
 		Status:    int(job.Status),
 		ExitCode:  job.ExitCode,
 		Metadata:  metaString,
-		BaseModel: BaseModel{DB: db},
+		BaseModel: BaseModel{DB: db, SupportsJSONFunctions: supportsJSON},
 	}, nil
 }
