@@ -23,19 +23,9 @@ func RegisterStatusCommand() {
 				shell.Fatalfln(3, "%v", err)
 			}
 
-			p := payload.JobPayload{Request: payload.REQUEST_STATUS}
-			if err := cli.BuildPayload(&p, payload.JobSearchMetadata{Search: args[0]}); err != nil {
-				shell.Fatalfln(3, "Failed to build payload: %v", err)
-			}
-			defer cli.Connection.Close()
-
-			if err := cli.SendPayload(p); err != nil {
-				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
-			}
-
-			var job payload.JobResponse
-			if err := cli.GetPayload(&job); err != nil {
-				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
+			job, err := cli.Status(args[0])
+			if err != nil {
+				shell.Fatalfln(3, "Failed to get job status: %v", err)
 			}
 
 			var duration string

@@ -50,7 +50,15 @@ func RegisterListCommand() {
 				shell.Fatalfln(3, "%v", err)
 			}
 
-			p := payload.JobPayload{Request: payload.REQUEST_LIST}
+			if jobNumberOnly {
+				count, err := cli.ListCount(activeOnly)
+				if err != nil {
+					shell.Fatalfln(3, "Failed to get job count: %v", err)
+				}
+				shell.Printfln("%v", count)
+				return
+			}
+
 			req := payload.JobSearchMetadata{
 				RequestMeta:    false,
 				ActiveOnly:     activeOnly,
@@ -61,26 +69,10 @@ func RegisterListCommand() {
 				FinishOnly:     finishOnly,
 				MetadataFilter: metadataFilter,
 			}
-			if err := cli.BuildPayload(&p, req); err != nil {
-				shell.Fatalfln(3, "Failed to build payload: %v", err)
-			}
 
-			if err := cli.SendPayload(p); err != nil {
-				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
-			}
-
-			if jobNumberOnly {
-				var resp payload.JobResponseCount
-				if err := cli.GetPayload(&resp); err != nil {
-					shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
-				}
-				shell.Printfln("%v", resp.Count)
-				return
-			}
-
-			var jobs []payload.JobResponse
-			if err := cli.GetPayload(&jobs); err != nil {
-				shell.Fatalfln(3, "Failed to get payload from daemon: %v", err)
+			jobs, err := cli.List(req)
+			if err != nil {
+				shell.Fatalfln(3, "Failed to list jobs: %v", err)
 			}
 
 			if toJson {
