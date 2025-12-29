@@ -41,6 +41,9 @@ type JobFilter struct {
 	// Keys are metadata field names, and values are the desired values.
 	MetadataFilter map[string]string
 
+	// GeneralKeywordSearch applies to JobFilter.ID OR JobFilter.Keyword
+	GeneralKeywordSearch string
+
 	DBGetFilter
 }
 
@@ -72,7 +75,12 @@ func (j *JobModel) applyCriteria(query string, args []any, filter *JobFilter) (s
 	}
 	if filter.Keyword != "" {
 		whereClauses = append(whereClauses, "job_name LIKE ?")
-		whereArgs = append(whereArgs, "%"+filter.Keyword+"%")
+		whereArgs = append(whereArgs, filter.Keyword)
+	}
+
+	if filter.GeneralKeywordSearch != "" {
+		whereClauses = append(whereClauses, "(id LIKE ? OR job_name LIKE ?)")
+		whereArgs = append(whereArgs, filter.GeneralKeywordSearch+"%", filter.GeneralKeywordSearch)
 	}
 
 	// Filter for active jobs

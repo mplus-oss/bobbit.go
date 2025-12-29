@@ -159,13 +159,12 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 	}
 
 	filter := &models.JobFilter{
-		ActiveOnly:     req.ActiveOnly,
-		FinishOnly:     req.FinishOnly,
-		MetadataFilter: req.MetadataFilter,
+		ActiveOnly:           req.ActiveOnly,
+		FinishOnly:           req.FinishOnly,
+		MetadataFilter:       req.MetadataFilter,
+		GeneralKeywordSearch: req.Search,
 		DBGetFilter: models.DBGetFilter{
 			Limit:    req.Limit,
-			ID:       req.Search,
-			Keyword:  req.Search,
 			SortDesc: req.OrderDesc,
 		},
 	}
@@ -221,10 +220,9 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	}
 
 	filter := &models.JobFilter{
-		ActiveOnly: true,
+		ActiveOnly:           true,
+		GeneralKeywordSearch: req.Search,
 		DBGetFilter: models.DBGetFilter{
-			ID:       req.Search,
-			Keyword:  req.Search,
 			Limit:    1,
 			SortDesc: true,
 		},
@@ -270,9 +268,8 @@ func (d *DaemonStruct) StatusJob(jc *JobContext) error {
 	}
 
 	filter := &models.JobFilter{
+		GeneralKeywordSearch: req.Search,
 		DBGetFilter: models.DBGetFilter{
-			ID:       req.Search,
-			Keyword:  req.Search,
 			Limit:    1,
 			SortDesc: true,
 		},
@@ -311,9 +308,8 @@ func (d *DaemonStruct) StopJob(jc *JobContext) error {
 	}
 
 	filter := &models.JobFilter{
+		GeneralKeywordSearch: req.Search,
 		DBGetFilter: models.DBGetFilter{
-			ID:       req.Search,
-			Keyword:  req.Search,
 			Limit:    1,
 			SortDesc: true,
 		},
