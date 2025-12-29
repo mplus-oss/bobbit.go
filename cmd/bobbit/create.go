@@ -27,19 +27,14 @@ func RegisterCreateCommand() {
 				}
 			}
 
-			p := payload.JobPayload{Request: payload.REQUEST_EXECUTE_JOB}
 			req := payload.JobDetailMetadata{
 				JobName:  jobName,
 				Command:  command,
 				Metadata: metadata,
 			}
-			if err := cli.BuildPayload(&p, req); err != nil {
-				shell.Fatalfln(3, "Failed to build payload: %v", err)
-			}
-			defer cli.Connection.Close()
 
-			if err := cli.SendPayload(p); err != nil {
-				shell.Fatalfln(3, "Failed to send payload to daemon: %v", err)
+			if err := cli.Create(req); err != nil {
+				shell.Fatalfln(3, "Failed to create job: %v", err)
 			}
 			shell.Printfln("Job %s created!", jobName)
 		},

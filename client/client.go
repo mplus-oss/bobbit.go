@@ -72,3 +72,171 @@ func (d *DaemonConnectionStruct) GetPayload(target any) error {
 
 	return nil
 }
+
+// TestConnection verifies if the daemon is reachable and responding.
+// It sends a simple vibe check payload and returns nil if successful.
+func (d *DaemonConnectionStruct) TestConnection() error {
+	p := payload.JobPayload{Request: payload.REQUEST_VIBE_CHECK}
+	if err := d.BuildPayload(&p, make(map[string]string, 1)); err != nil {
+		return err
+	}
+	defer d.Connection.Close()
+
+	if err := d.SendPayload(p); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Status retrieves the detailed status of a specific job by its ID.
+// Returns the JobResponse containing job details or an error if the request fails.
+func (d *DaemonConnectionStruct) Status(id string) (payload.JobResponse, error) {
+	p := payload.JobPayload{Request: payload.REQUEST_STATUS}
+	if err := d.BuildPayload(&p, payload.JobSearchMetadata{Search: id}); err != nil {
+		return payload.JobResponse{}, err
+	}
+	defer d.Connection.Close()
+
+	if err := d.SendPayload(p); err != nil {
+		return payload.JobResponse{}, err
+	}
+
+	var job payload.JobResponse
+	if err := d.GetPayload(&job); err != nil {
+		return payload.JobResponse{}, err
+	}
+
+	return job, nil
+}
+
+// Create submits a new job execution request to the daemon.
+// Takes JobDetailMetadata containing command, name, and other options.
+func (d *DaemonConnectionStruct) Create(req payload.JobDetailMetadata) error {
+	p := payload.JobPayload{Request: payload.REQUEST_EXECUTE_JOB}
+	if err := d.BuildPayload(&p, req); err != nil {
+		return err
+	}
+	defer d.Connection.Close()
+
+	if err := d.SendPayload(p); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Wait blocks until the specified job has finished execution.
+// Returns the final JobResponse or an error if the wait fails.
+func (d *DaemonConnectionStruct) Wait(id string) (job payload.JobResponse, err error) {
+	p := payload.JobPayload{Request: payload.REQUEST_WAIT}
+	if err = d.BuildPayload(&p, payload.JobSearchMetadata{Search: id}); err != nil {
+		return job, err
+	}
+	defer d.Connection.Close()
+
+	if err = d.SendPayload(p); err != nil {
+		return job, err
+	}
+
+	if err = d.GetPayload(&job); err != nil {
+		return job, err
+	}
+
+	return job, nil
+}
+
+// List retrieves a list of jobs based on the provided search criteria.
+func (d *DaemonConnectionStruct) List(req payload.JobSearchMetadata) ([]payload.JobResponse, error) {
+	p := payload.JobPayload{Request: payload.REQUEST_LIST}
+	if err := d.BuildPayload(&p, req); err != nil {
+		return []payload.JobResponse{}, err
+	}
+	defer d.Connection.Close()
+
+	if err := d.SendPayload(p); err != nil {
+		return []payload.JobResponse{}, err
+	}
+
+	var jobs []payload.JobResponse
+	if err := d.GetPayload(&jobs); err != nil {
+		return []payload.JobResponse{}, err
+	}
+
+	return jobs, nil
+}
+
+// ListCount returns the number of jobs matching the activeOnly criteria.
+// If activeOnly is true, counts active jobs; otherwise counts finished/failed jobs.
+// Note: This matches the user's specific logic for active vs finish only.
+func (d *DaemonConnectionStruct) ListCount(activeOnly bool) (int, error) {
+	p := payload.JobPayload{Request: payload.REQUEST_LIST}
+	req := payload.JobSearchMetadata{NumberOnly: true}
+
+	if activeOnly {
+		req.ActiveOnly = true
+	} else {
+		req.FinishOnly = true
+	}
+
+	if err := d.BuildPayload(&p, req); err != nil {
+		return 0, err
+	}
+	defer d.Connection.Close()
+
+	if err := d.SendPayload(p); err != nil {
+		return 0, err
+	}
+
+	var count payload.JobResponseCount
+	if err := d.GetPayload(&count); err != nil {
+		return 0, err
+	}
+
+	return count.Count, nil
+}
+
+// Stop sends a request to stop a running job by its name or ID.
+// Returns the JobResponse of the stopped job or an error if the request fails.
+func (d *DaemonConnectionStruct) Stop(jobNameOrId string) (payload.JobResponse, error) {
+	p := payload.JobPayload{Request: payload.REQUEST_STOP}
+	req := payload.JobSearchMetadata{
+		Search: jobNameOrId,
+	}
+	if err := d.BuildPayload(&p, req); err != nil {
+		return payload.JobResponse{}, err
+	}
+	defer d.Connection.Close()
+
+	if err := d.SendPayload(p); err != nil {
+		return payload.JobResponse{}, err
+	}
+
+	var job payload.JobResponse
+	if err := d.GetPayload(&job); err != nil {
+		return payload.JobResponse{}, err
+	}
+
+	return job, nil
+}
+
+// FindJob attempts to locate a single job matching the provided query parameters.
+// This uses REQUEST_STATUS under the hood, similar to Status but with a full metadata struct.
+func (d *DaemonConnectionStruct) FindJob(query payload.JobSearchMetadata) (payload.JobResponse, error) {
+	p := payload.JobPayload{Request: payload.REQUEST_STATUS}
+	if err := d.BuildPayload(&p, query); err != nil {
+		return payload.JobResponse{}, err
+	}
+	defer d.Connection.Close()
+
+	if err := d.SendPayload(p); err != nil {
+		return payload.JobResponse{}, err
+	}
+
+	var job payload.JobResponse
+	if err := d.GetPayload(&job); err != nil {
+		return payload.JobResponse{}, err
+	}
+
+	return job, nil
+}
