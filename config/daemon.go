@@ -37,7 +37,7 @@ func NewDaemon() BobbitDaemonConfig {
 	}
 
 	return BobbitDaemonConfig{
-		DataPath:      lib.GetDefaultEnv("BOBBITD_LOGS_DIR", "/tmp/bobbitd/"),
+		DataPath:      lib.GetDefaultEnv("BOBBITD_DATA_DIR", "/tmp/bobbitd/"),
 		DBMaxOpenConn: maxOpenConn,
 		DBMaxIdleConn: maxIdleConn,
 		BobbitConfig:  BaseConfig(),
