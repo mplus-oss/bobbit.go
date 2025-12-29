@@ -51,22 +51,17 @@ func (d *DaemonConnectionStruct) SendPayload(target any) error {
 // GetPayload decodes the response from the daemon connection into the provided target object.
 // It returns an error if decoding fails.
 func (d *DaemonConnectionStruct) GetPayload(target any) error {
-	decoder := json.NewDecoder(d.Connection)
-	if err := decoder.Decode(target); err != nil {
-		var raw json.RawMessage
-		if err := decoder.Decode(&raw); err != nil {
-			return err
-		}
+	var raw json.RawMessage
+	if err := json.NewDecoder(d.Connection).Decode(&raw); err != nil {
+		return err
+	}
 
-		if err := json.Unmarshal(raw, target); err == nil {
-			return nil
-		}
+	var errorPayload payload.JobErrorResponse
+	if err := json.Unmarshal(raw, &errorPayload); err == nil && errorPayload.Error != "" {
+		return errors.New(errorPayload.Error)
+	}
 
-		var errorPayload payload.JobErrorResponse
-		if json.Unmarshal(raw, &errorPayload) == nil && errorPayload.Error != "" {
-			return errors.New(errorPayload.Error)
-		}
-
+	if err := json.Unmarshal(raw, target); err != nil {
 		return err
 	}
 
