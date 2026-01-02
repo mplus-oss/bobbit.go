@@ -26,6 +26,7 @@ func RouteHandler(d *daemon.DaemonStruct, jc *daemon.JobContext) {
 		payload.REQUEST_WAIT:        d.WaitJob,
 		payload.REQUEST_STATUS:      d.StatusJob,
 		payload.REQUEST_STOP:        d.StopJob,
+		payload.REQUEST_TAIL_LOG:    d.HandleTailJobLog,
 	}
 
 	var (
