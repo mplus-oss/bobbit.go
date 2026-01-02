@@ -23,6 +23,7 @@ func init() {
 	RegisterWaitCommand()
 	RegisterStatusCommand()
 	RegisterStopCommand()
+	RegisterTailCommand()
 }
 
 func main() {
