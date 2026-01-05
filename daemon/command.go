@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -325,7 +326,9 @@ func (d *DaemonStruct) StopJob(jc *JobContext) error {
 	}
 
 	job := jobs[0]
-	if err := syscall.Kill(-job.PID, syscall.SIGTERM); err != nil {
+	if err := syscall.Kill(-job.PID, syscall.SIGTERM); errors.Is(err, syscall.ESRCH) {
+		log.Printf("[WARNING] Failed when killing the pid: %v", err)
+	} else if err != nil {
 		return err
 	}
 
