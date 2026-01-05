@@ -42,7 +42,7 @@ func BaseConfig() BobbitConfig {
 	}
 
 	return BobbitConfig{
-		DataPath:      lib.GetDefaultEnv("BOBBIT_DATA_DIR", "/tmp/bobbitd/"),
+		DataPath:   lib.GetDefaultEnv("BOBBIT_DATA_DIR", "/tmp/bobbitd/"),
 		SocketPath: lib.GetDefaultEnv("BOBBIT_SOCKET_PATH", "/tmp/bobbitd.sock"),
 		DebugMode:  debug,
 	}
