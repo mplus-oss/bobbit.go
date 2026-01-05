@@ -1,8 +1,10 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 
 	"github.com/mplus-oss/bobbit.go/config"
@@ -234,4 +236,61 @@ func (d *DaemonConnectionStruct) FindJob(query payload.JobSearchMetadata) (paylo
 	}
 
 	return job, nil
+}
+
+// TailJobLogWithContext streams a job's log file in real-time with context support.
+// It takes a context for cancellation, job ID or search string, and a callback function.
+// The callback receives the log line as a string. If the callback returns an error, streaming stops.
+// Returns an error if the request fails, job is not found, or context is cancelled.
+func (d *DaemonConnectionStruct) TailJobLogWithContext(ctx context.Context, jobIDOrName string, follow bool, onLine func(string) error) error {
+	p := payload.JobPayload{Request: payload.REQUEST_TAIL_LOG}
+	search := payload.JobSearchMetadata{Search: jobIDOrName, Follow: follow}
+	if err := d.BuildPayload(&p, search); err != nil {
+		return err
+	}
+	defer d.Connection.Close()
+
+	if err := d.SendPayload(p); err != nil {
+		return err
+	}
+
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			d.Connection.Close()
+		case <-done:
+		}
+	}()
+
+	decoder := json.NewDecoder(d.Connection)
+	// Scan every single new request.
+	// Surely will cannot bumped to another connection...
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		var line map[string]string
+		if err := decoder.Decode(&line); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			// Check if error is due to context cancellation
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return err
+		}
+
+		if logLine, ok := line["line"]; ok {
+			if err := onLine(logLine); err != nil {
+				return err
+			}
+		}
+	}
 }

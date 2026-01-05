@@ -11,9 +11,11 @@ import (
 	"os/exec"
 	"syscall"
 
+	"github.com/mplus-oss/bobbit.go/config"
 	"github.com/mplus-oss/bobbit.go/internal/lib"
 	"github.com/mplus-oss/bobbit.go/metadata/models"
 	"github.com/mplus-oss/bobbit.go/payload"
+	"github.com/nxadm/tail"
 )
 
 type HandlerFunc func(jc *JobContext) error
@@ -68,7 +70,7 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 	}
 
 	// Prepare the logfile
-	logFile := GenerateJobLogPath(jc.daemon.BobbitDaemonConfig, p)
+	logFile := config.GenerateJobLogPath(jc.daemon.BobbitConfig, p)
 	logOutput, err := os.Create(logFile)
 	if err != nil {
 		return &DaemonPayloadError{"Failed to create logfile", p.ID, err}
@@ -341,4 +343,99 @@ func (d *DaemonStruct) StopJob(jc *JobContext) error {
 	}
 
 	return nil
+}
+
+// HandleTailJobLog handles requests to tail/stream a job's log file in real-time.
+// It finds the job, locates its log file, and streams log lines to the client
+// until the connection is closed or the job completes.
+func (d *DaemonStruct) HandleTailJobLog(jc *JobContext) error {
+	var req payload.JobSearchMetadata
+	if err := jc.Payload.UnmarshalMetadata(&req); err != nil {
+		return &DaemonError{"Invalid metadata: Failed to unmarshal request metadata", err}
+	}
+
+	jobModel, err := models.NewJobModel(jc.daemon.DB, payload.JobResponse{})
+	if err != nil {
+		return &DaemonError{"Failed when initialize db model", err}
+	}
+
+	filter := &models.JobFilter{
+		GeneralKeywordSearch: req.Search,
+		DBGetFilter: models.DBGetFilter{
+			Limit:    1,
+			SortDesc: true,
+		},
+	}
+	jobs, err := jobModel.Get(filter)
+	if err != nil {
+		return &DaemonError{"Failed when finding job", err}
+	}
+	if len(jobs) < 1 {
+		return &DaemonError{"Job not found", fmt.Errorf("no job found for search: %s", req.Search)}
+	}
+
+	jobResp, err := jobs[0].ToPayload()
+	if err != nil {
+		return &DaemonError{"Failed when parsing the payload", err}
+	}
+
+	logPath := config.GenerateJobLogPath(jc.daemon.BobbitConfig, jobResp.JobDetailMetadata)
+	if logPath == "" {
+		return &DaemonError{"Failed to generate log path", nil}
+	}
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		return &DaemonError{"Log file not found", fmt.Errorf("path: %s", logPath)}
+	}
+
+	// Setup tail with follow mode
+	t, err := tail.TailFile(logPath, tail.Config{
+		Follow: req.Follow,
+		ReOpen: req.Follow,
+		Location: &tail.SeekInfo{
+			Offset: 0,
+			Whence: io.SeekStart,
+		},
+		MustExist: true,
+		Poll:      true,
+	})
+	if err != nil {
+		return &DaemonError{"Failed to tail log file", err}
+	}
+	defer t.Stop()
+
+	// No defer close(done) here because we might close it manually in this function
+	done := make(chan struct{})
+	go func() {
+		// Attempt to read 1 byte. Since we don't expect any more data from client,
+		// this will block until client disconnects (EOF) or connection error occurs.
+		buf := make([]byte, 1)
+		jc.conn.Read(buf)
+		close(done)
+	}()
+
+	// Stream lines to client
+	encoder := json.NewEncoder(jc.conn)
+	for {
+		select {
+		case line, ok := <-t.Lines:
+			if !ok {
+				// It should be closed
+				return nil
+			}
+			if line.Err != nil {
+				log.Printf("Error reading log line: %v", line.Err)
+				continue
+			}
+
+			if err := encoder.Encode(map[string]string{"line": line.Text}); err != nil {
+				// Client disconnected or error writing
+				return nil
+			}
+
+		case <-done:
+			// Connection closed by client.
+			// Check function that calling close(done).
+			return nil
+		}
+	}
 }

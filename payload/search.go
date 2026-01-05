@@ -37,4 +37,7 @@ type JobSearchMetadata struct {
 	// MetadataFilter allows filtering jobs based on their metadata.
 	// It's a map where keys are metadata field names and values are the desired values.
 	MetadataFilter map[string]string `json:"metadata_filter,omitempty"`
+
+	// Follow indicates whether to stream new log lines in real-time (similar to command tail -f).
+	Follow bool `json:"follow,omitempty"`
 }

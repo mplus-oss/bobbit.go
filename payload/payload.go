@@ -22,6 +22,9 @@ const (
 	// REQUEST_STOP indicates a request to stop a job.
 	// If the job exist, the return is JobResponse. If the job not exist, the return is an empty JobResponse.
 	REQUEST_STOP
+	// REQUEST_TAIL_LOG indicates a request to tail/stream a job's log file in real-time.
+	// Returns streaming log lines until connection is closed or job completes.
+	REQUEST_TAIL_LOG
 )
 
 // ParsePayloadRequest return humanize value of PayloadRequestEnum
@@ -39,6 +42,8 @@ func ParsePayloadRequest(payloadReq PayloadRequestEnum) (status string) {
 		status = "VIBE_CHECK"
 	case REQUEST_STOP:
 		status = "STOP"
+	case REQUEST_TAIL_LOG:
+		status = "TAIL_LOG"
 	default:
 		status = "UNKNOWN"
 	}

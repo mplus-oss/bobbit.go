@@ -7,12 +7,6 @@ import (
 )
 
 type BobbitDaemonConfig struct {
-	// DataPath specifies the root directory where Bobbit Daemon working directory.
-	//
-	// The directory stores: `metadata.db` that stores job status and metadata; `logs/YYYY/MM/*.log`
-	// that stores logfile. Typically the logfile filename is random 64-bit hash pointer in the
-	// metadata database.
-	DataPath string
 	// SetMaxOpenConns sets the maximum number of open connections to the database. The default is 1.
 	//
 	// Check `(sql.DB).SetMaxOpenConns` for more information.
@@ -37,7 +31,6 @@ func NewDaemon() BobbitDaemonConfig {
 	}
 
 	return BobbitDaemonConfig{
-		DataPath:      lib.GetDefaultEnv("BOBBITD_DATA_DIR", "/tmp/bobbitd/"),
 		DBMaxOpenConn: maxOpenConn,
 		DBMaxIdleConn: maxIdleConn,
 		BobbitConfig:  BaseConfig(),

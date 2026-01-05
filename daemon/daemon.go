@@ -15,20 +15,6 @@ import (
 	"github.com/mplus-oss/bobbit.go/payload"
 )
 
-// DaemonFileTypeEnum represents the type of data file associated with a daemon job.
-type DaemonFileTypeEnum string
-
-const (
-	// DAEMON_LOCKFILE indicates a lock file, signifying a job is running.
-	DAEMON_LOCKFILE DaemonFileTypeEnum = "lockfile"
-	// DAEMON_LOGFILE indicates a log file for job output.
-	DAEMON_LOGFILE DaemonFileTypeEnum = "log"
-	// DAEMON_METADATA indicates a metadata file containing job details.
-	DAEMON_METADATA DaemonFileTypeEnum = "metadata"
-	// DAEMON_EXITCODE indicates a file containing the job's exit code.
-	DAEMON_EXITCODE DaemonFileTypeEnum = "exitcode"
-)
-
 // DaemonStruct holds the main components of the Bobbit daemon, including
 // its socket listener and configuration.
 type DaemonStruct struct {
