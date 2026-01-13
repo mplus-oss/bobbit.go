@@ -50,15 +50,6 @@ func RegisterListCommand() {
 				shell.Fatalfln(3, "%v", err)
 			}
 
-			if jobNumberOnly {
-				count, err := cli.ListCount(activeOnly)
-				if err != nil {
-					shell.Fatalfln(3, "Failed to get job count: %v", err)
-				}
-				shell.Printfln("%v", count)
-				return
-			}
-
 			req := payload.JobSearchMetadata{
 				RequestMeta:    false,
 				ActiveOnly:     activeOnly,
@@ -68,6 +59,15 @@ func RegisterListCommand() {
 				OrderDesc:      orderDesc,
 				FinishOnly:     finishOnly,
 				MetadataFilter: metadataFilter,
+			}
+
+			if jobNumberOnly {
+				count, err := cli.ListCount(req)
+				if err != nil {
+					shell.Fatalfln(3, "Failed to get job count: %v", err)
+				}
+				shell.Printfln("%v", count)
+				return
 			}
 
 			jobs, err := cli.List(req)
