@@ -44,24 +44,25 @@ type JobFilter struct {
 	// GeneralKeywordSearch applies to JobFilter.ID OR JobFilter.Keyword
 	GeneralKeywordSearch string
 
+	// HideCommand prevents the command from being exposed in the job response.
+	HideCommand bool `json:"hide_command,omitempty"`
+
 	DBGetFilter
 }
 
-// Save create new data in the table
-func (j *JobModel) Save() error {
-	query := `
-		INSERT INTO jobs (id, job_name, command, status, exit_code, metadata)
-		VALUES (:id, :job_name, :command, :status, :exit_code, :metadata)
-	`
-	_, err := j.DB.NamedExec(query, j)
-	return err
-}
-
-func (j *JobModel) Delete() {
-	_, err := j.DB.NamedExec("DELETE FROM jobs WHERE id = :id", j)
-	if err != nil {
-		log.Printf("[WARNING] Failed to delete %s job: %v", j.ID, err)
+// buildSelectQuery generates the raw SQL query for the jobs table.
+func (j *JobModel) buildSelectQuery(filter *JobFilter) string {
+	commandCol := "command"
+	if filter.HideCommand {
+		commandCol = "'[]' as command"
 	}
+
+	return fmt.Sprintf(`
+		SELECT
+			id, job_name, %s, status, exit_code,
+			metadata, pid, created_at, updated_at
+		FROM jobs
+	`, commandCol)
 }
 
 // applyCriteria appends the WHERE logic to the query and returns the updated query and args.
@@ -143,9 +144,26 @@ func (j *JobModel) applyCriteria(query string, args []any, filter *JobFilter) (s
 	return query, args
 }
 
+// Save create new data in the table
+func (j *JobModel) Save() error {
+	query := `
+		INSERT INTO jobs (id, job_name, command, status, exit_code, metadata)
+		VALUES (:id, :job_name, :command, :status, :exit_code, :metadata)
+	`
+	_, err := j.DB.NamedExec(query, j)
+	return err
+}
+
+func (j *JobModel) Delete() {
+	_, err := j.DB.NamedExec("DELETE FROM jobs WHERE id = :id", j)
+	if err != nil {
+		log.Printf("[WARNING] Failed to delete %s job: %v", j.ID, err)
+	}
+}
+
 // Get fetch the job data from the table and return it as a array of JobModel.
 func (j *JobModel) Get(filter *JobFilter) ([]*JobModel, error) {
-	query := "SELECT * FROM jobs"
+	query := j.buildSelectQuery(filter)
 	args := []any{}
 	query, args = j.applyCriteria(query, args, filter)
 
@@ -175,7 +193,7 @@ func (j *JobModel) WaitJob(ctx context.Context, cancel context.CancelFunc, filte
 			return finalJob, finalErr
 
 		case <-ticker.C:
-			query := "SELECT * FROM jobs"
+			query := j.buildSelectQuery(filter)
 			args := []any{}
 			filter.Limit = 1
 			query, args = j.applyCriteria(query, args, filter)

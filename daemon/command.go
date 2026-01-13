@@ -166,6 +166,7 @@ func (d *DaemonStruct) ListJob(jc *JobContext) error {
 		FinishOnly:           req.FinishOnly,
 		MetadataFilter:       req.MetadataFilter,
 		GeneralKeywordSearch: req.Search,
+		HideCommand:          req.HideCommand,
 		DBGetFilter: models.DBGetFilter{
 			Limit:    req.Limit,
 			SortDesc: req.OrderDesc,

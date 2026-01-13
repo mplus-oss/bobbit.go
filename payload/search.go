@@ -40,4 +40,7 @@ type JobSearchMetadata struct {
 
 	// Follow indicates whether to stream new log lines in real-time (similar to command tail -f).
 	Follow bool `json:"follow,omitempty"`
+
+	// HideCommand prevents the command from being exposed in the job response.
+	HideCommand bool `json:"hide_command,omitempty"`
 }
