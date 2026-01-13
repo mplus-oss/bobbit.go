@@ -45,7 +45,7 @@ type JobFilter struct {
 	GeneralKeywordSearch string
 
 	// HideCommand prevents the command from being exposed in the job response.
-	HideCommand bool `json:"hide_command,omitempty"`
+	HideCommand bool
 
 	DBGetFilter
 }

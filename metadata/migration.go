@@ -84,6 +84,8 @@ func runMigration(db *sqlx.DB) error {
 		"synchronous":  "NORMAL",
 	})
 
+	mustExecQuery(db)
+
 	return nil
 }
 
