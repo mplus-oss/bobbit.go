@@ -164,18 +164,9 @@ func (d *DaemonConnectionStruct) List(req payload.JobSearchMetadata) ([]payload.
 }
 
 // ListCount returns the number of jobs matching the activeOnly criteria.
-// If activeOnly is true, counts active jobs; otherwise counts finished/failed jobs.
-// Note: This matches the user's specific logic for active vs finish only.
-func (d *DaemonConnectionStruct) ListCount(activeOnly bool) (int, error) {
+func (d *DaemonConnectionStruct) ListCount(req payload.JobSearchMetadata) (int, error) {
+	req.NumberOnly = true
 	p := payload.JobPayload{Request: payload.REQUEST_LIST}
-	req := payload.JobSearchMetadata{NumberOnly: true}
-
-	if activeOnly {
-		req.ActiveOnly = true
-	} else {
-		req.FinishOnly = true
-	}
-
 	if err := d.BuildPayload(&p, req); err != nil {
 		return 0, err
 	}
