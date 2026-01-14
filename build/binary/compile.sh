@@ -8,7 +8,7 @@ GOARCH=${GOARCH:-amd64}
 for cmd in ./cmd/*; do
     go get -C "$cmd"
 
-    ldflags="-w -s"
+    ldflags="-w -s $([ -n "${CONTAINERIZED:-}" ] && echo "-linkmode external -extldflags -static")"
     output="$(basename "$cmd")-$GOOS-$GOARCH"
 
     go build -C "$cmd" -ldflags="$ldflags" -o "../../build/dist/$output"
