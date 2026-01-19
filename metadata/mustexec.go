@@ -10,7 +10,7 @@ import (
 // connected to SQLite.
 func mustExecQuery(db *sqlx.DB) error {
 	trx := db.MustBegin()
-	qExec := func (purpose, query string, args ...any) {
+	qExec := func(purpose, query string, args ...any) {
 		log.Printf("MustExec: %v", purpose)
 		trx.MustExec(query, args...)
 	}
