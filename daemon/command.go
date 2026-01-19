@@ -224,7 +224,6 @@ func (d *DaemonStruct) WaitJob(jc *JobContext) error {
 	}
 
 	filter := &models.JobFilter{
-		ActiveOnly:           true,
 		GeneralKeywordSearch: req.Search,
 		DBGetFilter: models.DBGetFilter{
 			Limit:    1,

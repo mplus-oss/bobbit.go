@@ -186,6 +186,7 @@ func (j *JobModel) WaitJob(ctx context.Context, cancel context.CancelFunc, filte
 
 	var finalJob *JobModel
 	var finalErr error
+	jobFound := false
 
 	for {
 		select {
@@ -201,6 +202,12 @@ func (j *JobModel) WaitJob(ctx context.Context, cancel context.CancelFunc, filte
 			var p JobModel
 			if err := j.DB.GetContext(ctx, &p, query, args...); err != nil {
 				if err == sql.ErrNoRows {
+					// If job was previously found but now not found,
+					// it means the job record was deleted or is no longer matching the filter.
+					if jobFound {
+						finalErr = fmt.Errorf("Job was found but is no longer available")
+						cancel()
+					}
 					continue
 				}
 
@@ -208,6 +215,9 @@ func (j *JobModel) WaitJob(ctx context.Context, cancel context.CancelFunc, filte
 				cancel()
 				continue
 			}
+
+			// Mark that we've found the job at least once
+			jobFound = true
 
 			p.BaseModel = j.BaseModel
 			if p.Status != int(payload.JOB_RUNNING) {
