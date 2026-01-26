@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/mplus-oss/bobbit.go/client"
 	"github.com/mplus-oss/bobbit.go/config"
 	"github.com/mplus-oss/bobbit.go/metadata"
 	"github.com/mplus-oss/bobbit.go/payload"
@@ -77,9 +78,34 @@ func (d *DaemonStruct) NewJobContext(conn net.Conn) *JobContext {
 // CleanupDaemon listens for an OS signal and performs cleanup operations
 // before exiting. It removes the daemon's socket file.
 func (d *DaemonStruct) CleanupDaemon(sigChan <-chan os.Signal) {
-	<-sigChan
-	log.Println("Cleanup daemon...")
-	os.Remove(d.SocketPath)
+	sig := <-sigChan
+	log.Printf("Received signal %v. Starting cleanup daemon...", sig)
+
+	log.Printf("Bootstrapping new client for daemon.")
+	cli := client.New(config.NewClient())
+
+	// List running app and force it to exit
+	req, err := cli.List(payload.JobSearchMetadata{
+		ActiveOnly: true,
+	})
+	if err != nil {
+		log.Printf("Failed to list the active jobs: %v", err)
+	} else {
+		for _, job := range req {
+			log.Printf("Stopping running job: %v", job.ID)
+			if _, err := cli.Stop(job.ID); err != nil {
+				log.Printf("Failed when stopping the job [%v]: %v", job.ID, err)
+				continue
+			}
+		}
+	}
+
+	log.Println("Removing socket file...")
+	if err := os.Remove(d.SocketPath); err != nil && !os.IsNotExist(err) {
+		log.Printf("Warning: Failed to remove socket: %v", err)
+	}
+
+	log.Println("Daemon cleanup finished. Exiting.")
 	os.Exit(0)
 }
 
