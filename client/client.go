@@ -86,11 +86,11 @@ func (d *DaemonConnectionStruct) TestConnection() error {
 	return nil
 }
 
-// Status retrieves the detailed status of a specific job by its ID.
+// Status retrieves the detailed status of a specific job by its searchQuery (jobID or jobName by desc).
 // Returns the JobResponse containing job details or an error if the request fails.
-func (d *DaemonConnectionStruct) Status(id string) (payload.JobResponse, error) {
+func (d *DaemonConnectionStruct) Status(searchQuery string) (payload.JobResponse, error) {
 	p := payload.JobPayload{Request: payload.REQUEST_STATUS}
-	if err := d.BuildPayload(&p, payload.JobSearchMetadata{Search: id}); err != nil {
+	if err := d.BuildPayload(&p, payload.JobSearchMetadata{Search: searchQuery}); err != nil {
 		return payload.JobResponse{}, err
 	}
 	defer d.Connection.Close()
@@ -109,25 +109,31 @@ func (d *DaemonConnectionStruct) Status(id string) (payload.JobResponse, error) 
 
 // Create submits a new job execution request to the daemon.
 // Takes JobDetailMetadata containing command, name, and other options.
-func (d *DaemonConnectionStruct) Create(req payload.JobDetailMetadata) error {
+func (d *DaemonConnectionStruct) Create(req payload.JobDetailMetadata) (job payload.JobResponse, err error) {
 	p := payload.JobPayload{Request: payload.REQUEST_EXECUTE_JOB}
 	if err := d.BuildPayload(&p, req); err != nil {
-		return err
+		return job, err
 	}
 	defer d.Connection.Close()
 
 	if err := d.SendPayload(p); err != nil {
-		return err
+		return job, err
 	}
 
-	return nil
+	if err := d.GetPayload(&job); err != nil {
+		return job, err
+	}
+
+	return job, nil
 }
 
 // Wait blocks until the specified job has finished execution.
 // Returns the final JobResponse or an error if the wait fails.
-func (d *DaemonConnectionStruct) Wait(id string) (job payload.JobResponse, err error) {
+//
+// See: DaemonConnectionStruct.Status
+func (d *DaemonConnectionStruct) Wait(searchQuery string) (job payload.JobResponse, err error) {
 	p := payload.JobPayload{Request: payload.REQUEST_WAIT}
-	if err = d.BuildPayload(&p, payload.JobSearchMetadata{Search: id}); err != nil {
+	if err = d.BuildPayload(&p, payload.JobSearchMetadata{Search: searchQuery}); err != nil {
 		return job, err
 	}
 	defer d.Connection.Close()
@@ -186,10 +192,10 @@ func (d *DaemonConnectionStruct) ListCount(req payload.JobSearchMetadata) (int, 
 
 // Stop sends a request to stop a running job by its name or ID.
 // Returns the JobResponse of the stopped job or an error if the request fails.
-func (d *DaemonConnectionStruct) Stop(jobNameOrId string) (payload.JobResponse, error) {
+func (d *DaemonConnectionStruct) Stop(searchQuery string) (payload.JobResponse, error) {
 	p := payload.JobPayload{Request: payload.REQUEST_STOP}
 	req := payload.JobSearchMetadata{
-		Search: jobNameOrId,
+		Search: searchQuery,
 	}
 	if err := d.BuildPayload(&p, req); err != nil {
 		return payload.JobResponse{}, err

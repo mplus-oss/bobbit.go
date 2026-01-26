@@ -82,13 +82,20 @@ func (d *DaemonStruct) HandleJob(jc *JobContext) error {
 		return &DaemonPayloadError{"No command provided", p.ID, err}
 	}
 
-	// Save the process
-	respPayload := payload.JobResponse{
+	// Begin the response structure
+	respPayload := &payload.JobResponse{
 		ExitCode:          -1,
 		Status:            payload.JOB_NOT_RUNNING,
 		JobDetailMetadata: p,
 	}
-	job, err := models.NewJobModel(jc.daemon.DB, respPayload)
+
+	// Return the response before executing code
+	if err := jc.SendPayload(respPayload); err != nil {
+		return &DaemonError{"Invalid metadata: Failed to send payload", err}
+	}
+
+	// Save the process
+	job, err := models.NewJobModel(jc.daemon.DB, *respPayload)
 	if err != nil {
 		return &DaemonPayloadError{"Failed when initialize db model", p.ID, err}
 	}

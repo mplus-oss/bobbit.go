@@ -33,10 +33,11 @@ func RegisterCreateCommand() {
 				Metadata: metadata,
 			}
 
-			if err := cli.Create(req); err != nil {
+			job, err := cli.Create(req)
+			if err != nil {
 				shell.Fatalfln(3, "Failed to create job: %v", err)
 			}
-			shell.Printfln("Job %s created!", jobName)
+			shell.Printfln("Job %s created! [%s]", job.JobName, job.ID)
 		},
 	}
 	create.Flags().StringP("metadata", "m", "", "JSON Metadata")
