@@ -2,15 +2,19 @@
 set -exu
 mkdir -p build/dist
 
-GOOS=${GOOS:-linux}
-GOARCH=${GOARCH:-amd64}
+arch_build=$(cat build/arch-list)
 
 for cmd in ./cmd/*; do
     go get -C "$cmd"
 
-    ldflags="-w -s $([ -n "${CONTAINERIZED:-}" ] && echo "-linkmode external -extldflags -static")"
-    output="$(basename "$cmd")-$GOOS-$GOARCH"
+    for arch in ${arch_build[@]}; do
+        export GOOS="${arch%/*}"
+        export GOARCH="${arch#*/}"
 
-    go build -C "$cmd" -ldflags="$ldflags" -o "../../build/dist/$output"
+        ldflags="-w -s"
+        output="$(basename "$cmd")-$GOOS-$GOARCH"
+
+        go build -C "$cmd" -ldflags="$ldflags" -o "../../build/dist/$output"
+        echo "$output done"
+    done
 done
-
