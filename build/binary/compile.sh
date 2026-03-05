@@ -2,19 +2,15 @@
 set -exu
 mkdir -p build/dist
 
-arch_build=$(cat build/arch-list)
+export CGO_ENABLED=1
+export CC=gcc
 
 for cmd in ./cmd/*; do
     go get -C "$cmd"
 
-    for arch in ${arch_build[@]}; do
-        export GOOS="${arch%/*}"
-        export GOARCH="${arch#*/}"
+    ldflags="-w -s -linkmode external -extldflags '-static'"
+    output="$(basename "$cmd")-$(go env GOOS)-$(go env GOARCH)"
 
-        ldflags="-w -s"
-        output="$(basename "$cmd")-$GOOS-$GOARCH"
-
-        go build -C "$cmd" -ldflags="$ldflags" -o "../../build/dist/$output"
-        echo "$output done"
-    done
+    go build -C "$cmd" -ldflags="$ldflags" -o "../../build/dist/$output"
+    echo "$output done"
 done

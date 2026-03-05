@@ -22,6 +22,8 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ github.ref_name }}
+      - name: Setup QEMU Action
+        uses: docker/setup-qemu-action@v4
       - name: Build file
         run: ./build/binary/containerized-compile.sh
       - name: Upload artifact

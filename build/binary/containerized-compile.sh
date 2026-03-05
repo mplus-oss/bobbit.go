@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -exu
-container_name=${DOCKER_CONTAINER_NAME:-bobbit-docker}
+
+platforms=("linux/amd64" "linux/arm64")
 
 if command -v docker &> /dev/null
 then
@@ -13,21 +14,10 @@ else
     exit 1
 fi
 
-"$CONTAINER_RUNTIME" build \
-    -t "$container_name:latest" \
-    --file ./build/binary/build.Dockerfile \
-    .
-
-"$CONTAINER_RUNTIME" create \
-    --name "$container_name" \
-    "$container_name:latest" \
-    $([ "$CONTAINER_RUNTIME" = 'docker' ] && echo "/bin/true")
-
-"$CONTAINER_RUNTIME" cp \
-    $([ "$CONTAINER_RUNTIME" = 'podman' ] && echo "--overwrite") \
-    "$container_name:/dist" \
-    build/
-
-"$CONTAINER_RUNTIME" rm "$container_name"
-"$CONTAINER_RUNTIME" image rm "$container_name:latest"
-
+for platform in "${platforms[@]}"; do
+    "$CONTAINER_RUNTIME" build \
+        --platform "$platform" \
+        --output type=local,dest=./build/dist \
+        --file ./build/binary/build.Dockerfile \
+        .
+done
