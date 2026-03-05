@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -141,6 +142,11 @@ func (j *JobModel) applyCriteria(query string, args []any, filter *JobFilter) (s
 		}
 	}
 
+	if os.Getenv("DEBUG") != "" {
+		log.Printf("QUERY: %v", query)
+		log.Printf("ARGS: %v", args)
+	}
+
 	return query, args
 }
 
@@ -232,7 +238,15 @@ func (j *JobModel) WaitJob(ctx context.Context, cancel context.CancelFunc, filte
 func (j *JobModel) Count(filter *JobFilter) (int, error) {
 	query := "SELECT COUNT(*) FROM jobs"
 	args := []any{}
-	query, args = j.applyCriteria(query, args, filter)
+
+	// Dumbass to forget clone the filter,
+	// this need cuz for avoid mutating the original
+	// and make sure the offset and limit value is zero.
+	countFilter := *filter
+	countFilter.Limit = 0
+	countFilter.Offset = 0
+
+	query, args = j.applyCriteria(query, args, &countFilter)
 
 	var count int
 	if err := j.DB.Get(&count, query, args...); err != nil {
