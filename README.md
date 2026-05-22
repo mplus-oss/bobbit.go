@@ -11,17 +11,36 @@ bobbitd
 
 Run a job:
 ```
-bobbit create <job_name> <job_command>
+bobbit create <job_name> -- <command>
 ```
 
 Wait for a job:
 ```
-bobbit wait <job_name>
+bobbit wait <jobID|jobName>
 ```
 
-List running jobs:
+Check job status:
+```
+bobbit status <jobID|jobName>
+```
+
+List jobs:
 ```
 bobbit list
+```
+
+Stop a running job:
+```
+bobbit stop <jobID|jobName>
+```
+
+Tail job log:
+```
+# Stream log over socket
+bobbit tail <jobID|jobName> -f
+
+# Tail log file directly from filesystem (bypasses socket streaming)
+bobbit tail <jobID|jobName> -f -d
 ```
 
 ## Configuration
