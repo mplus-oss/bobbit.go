@@ -263,8 +263,6 @@ func (d *DaemonConnectionStruct) TailJobLogWithContext(ctx context.Context, jobI
 	}()
 
 	decoder := json.NewDecoder(d.Connection)
-	// Scan every single new request.
-	// Surely will cannot bumped to another connection...
 	for {
 		select {
 		case <-ctx.Done():
@@ -272,15 +270,24 @@ func (d *DaemonConnectionStruct) TailJobLogWithContext(ctx context.Context, jobI
 		default:
 		}
 
-		var line map[string]string
-		if err := decoder.Decode(&line); err != nil {
+		var raw json.RawMessage
+		if err := decoder.Decode(&raw); err != nil {
 			if err == io.EOF {
 				return nil
 			}
-			// Check if error is due to context cancellation
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
+			return err
+		}
+
+		var errorPayload payload.JobErrorResponse
+		if err := json.Unmarshal(raw, &errorPayload); err == nil && errorPayload.Error != "" {
+			return errors.New(errorPayload.Error)
+		}
+
+		var line map[string]string
+		if err := json.Unmarshal(raw, &line); err != nil {
 			return err
 		}
 

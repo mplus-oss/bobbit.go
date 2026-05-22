@@ -397,10 +397,16 @@ func (d *DaemonStruct) HandleTailJobLog(jc *JobContext) error {
 		return &DaemonError{"Log file not found", fmt.Errorf("path: %s", logPath)}
 	}
 
+	// If job is already finished, no need to follow
+	shouldFollow := req.Follow
+	if shouldFollow && (jobResp.Status == payload.JOB_FINISH || jobResp.Status == payload.JOB_FAILED || jobResp.Status == payload.JOB_STOPPED) {
+		shouldFollow = false
+	}
+
 	// Setup tail with follow mode
 	t, err := tail.TailFile(logPath, tail.Config{
-		Follow: req.Follow,
-		ReOpen: req.Follow,
+		Follow: shouldFollow,
+		ReOpen: shouldFollow,
 		Location: &tail.SeekInfo{
 			Offset: 0,
 			Whence: io.SeekStart,
